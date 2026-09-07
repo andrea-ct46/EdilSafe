@@ -35,13 +35,34 @@
 
     <!-- DASHBOARD -->
     <div id="dashboardView" class="max-w-5xl mx-auto p-6 space-y-6 hidden">
-        <header class="flex justify-between items-center bg-white border border-slate-200 p-4 rounded-xl shadow-sm">
+        <header class="flex justify-between items-center bg-white border border-slate-200 p-4 rounded-xl shadow-sm relative">
             <div class="flex items-center gap-2">
                 <span class="text-2xl">🏗️</span>
                 <span class="text-xl font-bold text-blue-700 tracking-tight">EdilSafe</span>
             </div>
+            
             <div class="flex items-center gap-4 text-sm text-slate-500">
                 <span id="creditiBadge" class="bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1 rounded-full font-semibold">Crediti: ...</span>
+                
+                <!-- MENU BURGER IN ALTO A DESTRA -->
+                <div class="relative">
+                    <button id="btnBurger" class="bg-slate-100 hover:bg-slate-200 p-2 rounded-lg text-slate-700 cursor-pointer flex items-center gap-1 text-sm font-semibold">
+                        <span>📁 Menu File</span>
+                        <span>▼</span>
+                    </button>
+                    
+                    <!-- Tendina File Manager -->
+                    <div id="burgerDropdown" class="hidden absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-lg p-4 z-50 space-y-3">
+                        <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+                            <span class="font-bold text-xs uppercase text-slate-500 tracking-wider">File Manager Aziendale</span>
+                            <button id="btnRefreshManager" class="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded cursor-pointer">Aggiorna</button>
+                        </div>
+                        <div id="fileManagerList" class="max-h-72 overflow-y-auto space-y-2 text-xs divide-y divide-slate-100">
+                            <p class="text-slate-400 py-2 text-center">Caricamento cartelle...</p>
+                        </div>
+                    </div>
+                </div>
+
                 <button id="btnLogout" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1 rounded cursor-pointer">Esci</button>
             </div>
         </header>
@@ -83,7 +104,7 @@
 
         <div id="loading" class="hidden bg-white border border-slate-200 rounded-xl p-8 text-center shadow-sm">
             <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent mb-2"></div>
-            <p class="text-sm font-semibold text-slate-600">Analisi e archiviazione nel cloud in corso...</p>
+            <p class="text-sm font-semibold text-slate-600">Analisi, classificazione e archiviazione in corso...</p>
         </div>
 
         <div id="results" class="hidden bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-6">
@@ -95,21 +116,9 @@
                 <textarea id="emailBox" readonly class="w-full h-28 bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-700 focus:outline-none resize-none"></textarea>
             </div>
         </div>
-
-        <!-- NUOVO: SEZIONE CARTELLA ARCHIVIO -->
-        <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-sm font-semibold text-slate-500 uppercase tracking-wider">📁 Archivio Documenti Impresa</h2>
-                <button id="btnRefreshCartella" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 py-1 px-3 rounded cursor-pointer font-semibold">Aggiorna Lista</button>
-            </div>
-            <div id="fileFolderList" class="divide-y divide-slate-100 text-sm max-h-60 overflow-y-auto">
-                <p class="text-slate-400 text-xs py-2">Caricamento archivio in corso...</p>
-            </div>
-        </div>
     </div>
 
     <script>
-        // INSERISCI QUI LE TUE CHIAVI
         const SUPABASE_URL = 'https://tknjthnrqunkehcqdnrj.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_L5SprRAfCuKNZ-GIwT_1tw_iuknN81x';
         
@@ -126,6 +135,24 @@
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');
 
+        // Gestione Menu Burger Tendina
+        const btnBurger = document.getElementById('btnBurger');
+        const burgerDropdown = document.getElementById('burgerDropdown');
+
+        btnBurger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            burgerDropdown.classList.toggle('hidden');
+            if (!burgerDropdown.classList.contains('hidden')) {
+                caricaFileManager();
+            }
+        });
+
+        document.addEventListener('click', () => {
+            burgerDropdown.classList.add('hidden');
+        });
+
+        burgerDropdown.addEventListener('click', (e) => e.stopPropagation());
+
         function mostraMessaggio(message, isError = true) {
             authMessage.innerText = message;
             authMessage.className = `text-xs text-center mt-2 ${isError ? 'text-rose-600' : 'text-emerald-600'}`;
@@ -140,48 +167,72 @@
             authMessage.classList.add('hidden');
         });
 
-        async function caricaCartellaArchivio() {
-            const fileFolderList = document.getElementById('fileFolderList');
-            fileFolderList.innerHTML = '<p class="text-slate-400 text-xs py-2">Aggiornamento in corso...</p>';
-            
+        // FILE MANAGER RICORSIVO NEL MENU BURGER
+        async function caricaFileManager() {
+            const container = document.getElementById('fileManagerList');
+            container.innerHTML = '<p class="text-slate-400 py-2 text-center">Scansione cartelle in corso...</p>';
+
             try {
                 const session = (await supabaseClient.auth.getSession()).data.session;
                 if (!session) return;
 
                 const { data: profilo } = await supabaseClient.from('profili').select('nome_impresa').eq('id', session.user.id).single();
-                const nomeCartella = (profilo?.nome_impresa || "Impresa_Generica").replace(/[^a-zA-Z0-9]/g, "_");
+                const nomeImpresa = (profilo?.nome_impresa || "Impresa_Generica").replace(/[^a-zA-Z0-9]/g, "_");
 
-                const { data: files, error } = await supabaseClient.storage.from('documenti-cantieri').list(nomeCartella, { sortBy: { column: 'created_at', order: 'desc' } });
-                
-                if (error || !files || files.length === 0) {
-                    fileFolderList.innerHTML = '<p class="text-slate-400 text-xs py-2">La cartella è vuota. Fai un audit per salvare il primo documento.</p>';
+                // Legge la cartella principale dell'impresa
+                const { data: list, error } = await supabaseClient.storage.from('documenti-cantieri').list(nomeImpresa, { limit: 100 });
+
+                if (error || !list || list.length === 0) {
+                    container.innerHTML = '<p class="text-slate-400 py-2 text-center">Nessun file o cartella trovata.</p>';
                     return;
                 }
 
-                fileFolderList.innerHTML = '';
-                for (const file of files) {
-                    if (file.name === '.emptyFolderPlaceholder') continue;
-                    
-                    const { data: signedUrl } = await supabaseClient.storage.from('documenti-cantieri').createSignedUrl(`${nomeCartella}/${file.name}`, 3600);
-                    const nomePulito = file.name.includes('_') ? file.name.substring(file.name.indexOf('_') + 1) : file.name;
-                    const dateObj = new Date(file.created_at);
+                container.innerHTML = '';
 
-                    fileFolderList.innerHTML += `
-                        <div class="flex justify-between items-center py-3">
-                            <div>
-                                <span class="text-slate-700 font-medium text-xs block">📄 ${nomePulito}</span>
-                                <span class="text-slate-400 text-[10px]">${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString()}</span>
+                for (const item of list) {
+                    // Se l'elemento è una sottocartella (es. POS, DURC, ecc.)
+                    if (!item.id && item.name) {
+                        const subfolderName = item.name;
+                        container.innerHTML += `<div class="font-bold text-blue-600 pt-2">📁 ${subfolderName}</div>`;
+
+                        // Leggi i file dentro la sottocartella
+                        const { data: subFiles } = await supabaseClient.storage.from('documenti-cantieri').list(`${nomeImpresa}/${subfolderName}`, { limit: 50 });
+                        
+                        if (subFiles && subFiles.length > 0) {
+                            for (const sf of subFiles) {
+                                if (sf.name === '.emptyFolderPlaceholder') continue;
+                                const { data: signedUrl } = await supabaseClient.storage.from('documenti-cantieri').createSignedUrl(`${nomeImpresa}/${subfolderName}/${sf.name}`, 3600);
+                                const pulito = sf.name.includes('_') ? sf.name.substring(sf.name.indexOf('_') + 1) : sf.name;
+
+                                container.innerHTML += `
+                                    <div class="pl-4 py-1.5 flex justify-between items-center hover:bg-slate-50 rounded">
+                                        <span class="text-slate-700 truncate max-w-[140px]" title="${pulito}">📄 ${pulito}</span>
+                                        ${signedUrl ? `<a href="${signedUrl.signedUrl}" target="_blank" class="text-[10px] bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-0.5 rounded font-semibold">Apri</a>` : ''}
+                                    </div>
+                                `;
+                            }
+                        } else {
+                            container.innerHTML += `<div class="pl-4 py-1 text-slate-400 italic">Cartella vuota</div>`;
+                        }
+                    } else if (item.name !== '.emptyFolderPlaceholder') {
+                        // File nella root dell'impresa
+                        const { data: signedUrl } = await supabaseClient.storage.from('documenti-cantieri').createSignedUrl(`${nomeImpresa}/${item.name}`, 3600);
+                        const pulito = item.name.includes('_') ? item.name.substring(item.name.indexOf('_') + 1) : item.name;
+
+                        container.innerHTML += `
+                            <div class="py-1.5 flex justify-between items-center hover:bg-slate-50 rounded">
+                                <span class="text-slate-700 truncate max-w-[160px]">📄 ${pulito}</span>
+                                ${signedUrl ? `<a href="${signedUrl.signedUrl}" target="_blank" class="text-[10px] bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-0.5 rounded font-semibold">Apri</a>` : ''}
                             </div>
-                            ${signedUrl ? `<a href="${signedUrl.signedUrl}" target="_blank" class="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 py-1.5 px-3 rounded font-semibold transition-colors">Apri / Scarica</a>` : ''}
-                        </div>
-                    `;
+                        `;
+                    }
                 }
             } catch (err) {
-                fileFolderList.innerHTML = `<p class="text-rose-500 text-xs py-2">Errore caricamento archivio: ${err.message}</p>`;
+                container.innerHTML = `<p class="text-rose-500 py-2 text-center">Errore caricamento file manager.</p>`;
             }
         }
 
-        document.getElementById('btnRefreshCartella').addEventListener('click', caricaCartellaArchivio);
+        document.getElementById('btnRefreshManager').addEventListener('click', caricaFileManager);
 
         async function mostraDashboard(userId) {
             loginView.classList.add('hidden');
@@ -189,8 +240,6 @@
 
             const { data } = await supabaseClient.from('profili').select('crediti').eq('id', userId).single();
             creditiBadge.innerText = `Crediti: ${data?.crediti !== undefined ? data.crediti : '...'}`;
-            
-            await caricaCartellaArchivio();
         }
 
         document.getElementById('btnLogin').addEventListener('click', async () => {
@@ -221,7 +270,6 @@
             dashboardView.classList.add('hidden');
         });
 
-        // Gestione File
         dropZone.addEventListener('click', () => fileInput.click());
         dropZone.addEventListener('dragover', (e) => e.preventDefault());
         dropZone.addEventListener('drop', (e) => { e.preventDefault(); handleFile(e.dataTransfer.files[0]); });
@@ -234,7 +282,6 @@
             document.getElementById('fileName').classList.remove('hidden');
         }
 
-        // Avvio Analisi
         document.getElementById('btnAnalyze').addEventListener('click', async () => {
             if (!selectedFile) return alert('Carica un PDF.');
             
@@ -257,10 +304,8 @@
 
                 if (data.error) return alert('Errore: ' + data.error);
 
-                // Aggiorna crediti e ricarica archivio per mostrare il file appena aggiunto!
                 await mostraDashboard(session.user.id);
 
-                // Renderizza Risultati
                 document.getElementById('results').classList.remove('hidden');
                 const banner = document.getElementById('statusBanner');
                 banner.className = `p-4 rounded-lg font-bold flex items-center gap-2 ${data.stato_generale === 'CONFORME' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`;
@@ -280,7 +325,6 @@
             }
         });
 
-        // Avvio Controllo Sessione
         (async function checkSession() {
             const { data } = await supabaseClient.auth.getSession();
             if (data?.session?.user) mostraDashboard(data.session.user.id);
