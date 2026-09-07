@@ -276,7 +276,7 @@
             mostraLogin();
         });
 
-        // Gestione PDF Drag & Drop
+        // Gestione PDF Drag & Drop (con controlli di sicurezza anti-crash)
         dropZone.addEventListener('click', () => fileInput.click());
         dropZone.addEventListener('dragover', (e) => e.preventDefault());
         dropZone.addEventListener('drop', (e) => {
@@ -296,23 +296,39 @@
             fileNameDisplay.innerText = `File selezionato: ${file.name}`;
             fileNameDisplay.classList.remove('hidden');
 
-            const arrayBuffer = await file.arrayBuffer();
-            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-            let fullText = "";
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+                const pdf = await loadingTask.promise;
+                let fullText = "";
 
-            for (let i = 1; i <= pdf.numPages; i++) {
-                const page = await pdf.getPage(i);
-                const content = await page.getTextContent();
-                const text = content.items.map(item => item.str).join(' ');
-                fullText += text + "\n";
+                const maxPages = Math.min(pdf.numPages, 30);
+
+                for (let i = 1; i <= maxPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const content = await page.getTextContent();
+                    const text = content.items.map(item => item.str).join(' ');
+                    fullText += text + "\n";
+                }
+
+                if (!fullText.trim()) {
+                    alert('Il PDF sembra vuoto o composto solo da immagini non leggibili (scansione raster). Carica un PDF con testo selezionabile.');
+                    extractedText = "";
+                    return;
+                }
+
+                extractedText = fullText;
+            } catch (err) {
+                console.error("Errore lettura PDF:", err);
+                alert('Impossibile leggere il file PDF. Il documento potrebbe essere protetto, corrotto o non compatibile.');
+                extractedText = "";
             }
-            extractedText = fullText;
         }
 
         // Avvio Analisi Audit con controllo crediti e upload storage sul server
         btnAnalyze.addEventListener('click', async () => {
             if (!extractedText) {
-                alert('Per favore carica prima un file PDF.');
+                alert('Per favore carica prima un file PDF valido.');
                 return;
             }
 
