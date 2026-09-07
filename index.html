@@ -40,7 +40,7 @@
         </div>
     </div>
 
-    <!-- DASHBOARD PRINCIPALE (Con Area App Completa) -->
+    <!-- DASHBOARD PRINCIPALE -->
     <div id="dashboardView" class="max-w-5xl mx-auto p-6 space-y-6 hidden">
         
         <header class="flex justify-between items-center bg-white border border-slate-200 p-4 rounded-xl shadow-sm">
@@ -131,16 +131,12 @@
     </div>
 
     <script>
-        // Configurazione Supabase
         const SUPABASE_URL = 'https://tknjthnrqunkehcqdnrj.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_L5SprRAfCuKNZ-GIwT_1tw_iuknN81x';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-        // URL della Edge Function Supabase
         const SUPABASE_FUNCTION_URL = "https://tknjthnrqunkehcqdnrj.supabase.co/functions/v1/audit";
 
         let selectedFile = null;
-        let extractedText = "";
         let isRegistering = false;
 
         const loginView = document.getElementById('loginView');
@@ -166,7 +162,6 @@
             authMessage.classList.remove('hidden');
         }
 
-        // Alterna tra Login e Registrazione
         btnToggleMode.addEventListener('click', () => {
             isRegistering = !isRegistering;
             extraFields.classList.toggle('hidden', !isRegistering);
@@ -191,7 +186,6 @@
                 }
             } catch (error) {
                 mostraLogin();
-                console.error('Errore verifica sessione:', error);
             }
         }
 
@@ -200,7 +194,7 @@
             dashboardView.classList.remove('hidden');
 
             creditiBadge.innerText = 'Crediti: ...';
-            const { data, error } = await supabaseClient
+            const { data } = await supabaseClient
                 .from('profili')
                 .select('crediti')
                 .eq('id', userId)
@@ -208,19 +202,17 @@
 
             if (data?.crediti !== undefined) {
                 creditiBadge.innerText = `Crediti: ${data.crediti}`;
-            } else if (error) {
+            } else {
                 creditiBadge.innerText = 'Crediti: 3';
-                console.error('Profilo in fase di creazione o errore:', error);
             }
         }
 
-        // Gestione Accesso / Registrazione unificata
         btnLogin.addEventListener('click', async () => {
             const email = document.getElementById('emailInput').value.trim();
             const password = document.getElementById('passwordInput').value;
 
             if (!email || !password || password.length < 6) {
-                mostraMessaggio('Inserisci un’email valida e una password di almeno 6 caratteri.');
+                mostraMessaggio('Inserisci email valida e password (min. 6 caratteri).');
                 return;
             }
 
@@ -245,12 +237,12 @@
                 } else if (data.session && data.user) {
                     await mostraDashboard(data.user.id);
                 } else {
-                    mostraMessaggio('Registrazione completata! Controlla la tua email per confermare l’account.', false);
+                    mostraMessaggio('Registrazione completata! Controlla la tua email.', false);
                 }
             } else {
                 const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
                 if (error) {
-                    mostraMessaggio('Credenziali non corrette o account non verificato.');
+                    mostraMessaggio('Credenziali non corrette.');
                 } else if (data.session) {
                     await mostraDashboard(data.user.id);
                 }
@@ -261,22 +253,12 @@
             if (event.key === 'Enter') btnLogin.click();
         });
 
-        supabaseClient.auth.onAuthStateChange((event, session) => {
-            if (event === 'SIGNED_OUT') {
-                mostraLogin();
-            } else if (event === 'SIGNED_IN' && session?.user && dashboardView.classList.contains('hidden')) {
-                mostraDashboard(session.user.id);
-            }
-        });
-
         btnLogout.addEventListener('click', async () => {
-            btnLogout.disabled = true;
             await supabaseClient.auth.signOut();
-            btnLogout.disabled = false;
             mostraLogin();
         });
 
-        // Gestione PDF Drag & Drop (con controlli di sicurezza anti-crash)
+        // Gestione PDF sicura senza parsing locale pesante
         dropZone.addEventListener('click', () => fileInput.click());
         dropZone.addEventListener('dragover', (e) => e.preventDefault());
         dropZone.addEventListener('drop', (e) => {
@@ -287,7 +269,7 @@
             if (e.target.files.length) handleFile(e.target.files[0]);
         });
 
-        async function handleFile(file) {
+        function handleFile(file) {
             if (file.type !== 'application/pdf') {
                 alert('Seleziona un file PDF valido.');
                 return;
@@ -295,40 +277,12 @@
             selectedFile = file;
             fileNameDisplay.innerText = `File selezionato: ${file.name}`;
             fileNameDisplay.classList.remove('hidden');
-
-            try {
-                const arrayBuffer = await file.arrayBuffer();
-                const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-                const pdf = await loadingTask.promise;
-                let fullText = "";
-
-                const maxPages = Math.min(pdf.numPages, 30);
-
-                for (let i = 1; i <= maxPages; i++) {
-                    const page = await pdf.getPage(i);
-                    const content = await page.getTextContent();
-                    const text = content.items.map(item => item.str).join(' ');
-                    fullText += text + "\n";
-                }
-
-                if (!fullText.trim()) {
-                    alert('Il PDF sembra vuoto o composto solo da immagini non leggibili (scansione raster). Carica un PDF con testo selezionabile.');
-                    extractedText = "";
-                    return;
-                }
-
-                extractedText = fullText;
-            } catch (err) {
-                console.error("Errore lettura PDF:", err);
-                alert('Impossibile leggere il file PDF. Il documento potrebbe essere protetto, corrotto o non compatibile.');
-                extractedText = "";
-            }
         }
 
-        // Avvio Analisi Audit con controllo crediti e upload storage sul server
+        // Avvio Analisi Audit inviando direttamente il file al server
         btnAnalyze.addEventListener('click', async () => {
-            if (!extractedText) {
-                alert('Per favore carica prima un file PDF valido.');
+            if (!selectedFile) {
+                alert('Carica prima un file PDF.');
                 return;
             }
 
@@ -336,11 +290,8 @@
             results.classList.add('hidden');
 
             try {
-                let base64File = "";
-                if (selectedFile) {
-                    const buffer = await selectedFile.arrayBuffer();
-                    base64File = btoa(String.fromCharCode(...new Uint8Array(buffer)));
-                }
+                const buffer = await selectedFile.arrayBuffer();
+                const base64File = btoa(String.fromCharCode(...new Uint8Array(buffer)));
 
                 const session = (await supabaseClient.auth.getSession()).data.session;
                 if (!session) {
@@ -356,9 +307,9 @@
                         'Authorization': `Bearer ${session.access_token}`
                     },
                     body: JSON.stringify({
-                        pdfText: extractedText,
+                        pdfText: "Documento PDF allegato in formato binario",
                         contextType: document.getElementById('contextType').value,
-                        fileName: selectedFile ? selectedFile.name : "documento.pdf",
+                        fileName: selectedFile.name,
                         fileBase64: base64File
                     })
                 });
@@ -371,7 +322,6 @@
                     return;
                 }
 
-                // Aggiorna il badge dei crediti rimanenti in tempo reale
                 if (data.crediti_rimasti !== undefined) {
                     creditiBadge.innerText = `Crediti: ${data.crediti_rimasti}`;
                 }
@@ -426,7 +376,6 @@
             alert('Testo email copiato negli appunti!');
         });
 
-        // Avvio controllo sessione all'apertura
         checkSession();
     </script>
 </body>
