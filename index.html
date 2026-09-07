@@ -42,23 +42,22 @@
             </div>
             
             <div class="flex items-center gap-4 text-sm text-slate-500">
-                <span id="pianoBadge" class="bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full font-semibold">Piano: Free (5 Scansioni/mese)</span>
+                <span id="pianoBadge" class="bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1 rounded-full font-semibold">Piano: Verificando...</span>
                 
-                <!-- MENU BURGER IN ALTO A DESTRA -->
+                <!-- MENU BURGER FILE MANAGER (RISERVATO A EDILSAFE+) -->
                 <div class="relative">
                     <button id="btnBurger" class="bg-slate-100 hover:bg-slate-200 p-2 rounded-lg text-slate-700 cursor-pointer flex items-center gap-1 text-sm font-semibold">
-                        <span>📁 Menu Storico</span>
+                        <span>📁 File Manager Plus</span>
                         <span>▼</span>
                     </button>
                     
-                    <!-- Tendina File Manager -->
                     <div id="burgerDropdown" class="hidden absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-lg p-4 z-50 space-y-3">
                         <div class="flex justify-between items-center border-b border-slate-100 pb-2">
-                            <span class="font-bold text-xs uppercase text-slate-500 tracking-wider">Storico Audit Personale</span>
+                            <span class="font-bold text-xs uppercase text-slate-500 tracking-wider">Archivio Cloud Aziendale</span>
                             <button id="btnRefreshManager" class="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded cursor-pointer">Aggiorna</button>
                         </div>
                         <div id="fileManagerList" class="max-h-72 overflow-y-auto space-y-2 text-xs divide-y divide-slate-100">
-                            <p class="text-slate-400 py-2 text-center">Nessun audit recente...</p>
+                            <p class="text-slate-400 py-2 text-center">Caricamento...</p>
                         </div>
                     </div>
                 </div>
@@ -104,7 +103,7 @@
 
         <div id="loading" class="hidden bg-white border border-slate-200 rounded-xl p-8 text-center shadow-sm">
             <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent mb-2"></div>
-            <p class="text-sm font-semibold text-slate-600">Analisi intelligente del documento in corso...</p>
+            <p class="text-sm font-semibold text-slate-600">Analisi intelligente in corso...</p>
         </div>
 
         <div id="results" class="hidden bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-6">
@@ -127,6 +126,8 @@
 
         let selectedFile = null;
         let isRegistering = false;
+        let utentePlus = false;
+        let nomeImpresaUtente = "";
 
         const loginView = document.getElementById('loginView');
         const dashboardView = document.getElementById('dashboardView');
@@ -137,11 +138,15 @@
         const btnBurger = document.getElementById('btnBurger');
         const burgerDropdown = document.getElementById('burgerDropdown');
 
-        btnBurger.addEventListener('click', (e) => {
+        btnBurger.addEventListener('click', async (e) => {
             e.stopPropagation();
+            if (!utentePlus) {
+                alert("🔒 Funzione riservata agli abbonati EdilSafe+. Passa al piano Plus per sbloccare il File Manager Cloud.");
+                return;
+            }
             burgerDropdown.classList.toggle('hidden');
             if (!burgerDropdown.classList.contains('hidden')) {
-                caricaStoricoAudit();
+                caricaFileManagerCloud();
             }
         });
 
@@ -165,56 +170,67 @@
             authMessage.classList.add('hidden');
         });
 
-        // STORICO AUDIT PERSONALE (Senza occupare storage)
-        async function caricaStoricoAudit() {
+        // FILE MANAGER CLOUD (Solo per EdilSafe+)
+        async function caricaFileManagerCloud() {
             const container = document.getElementById('fileManagerList');
-            container.innerHTML = '<p class="text-slate-400 py-2 text-center">Caricamento storico...</p>';
+            container.innerHTML = '<p class="text-slate-400 py-2 text-center">Caricamento file...</p>';
 
             try {
-                const session = (await supabaseClient.auth.getSession()).data.session;
-                if (!session) return;
+                const { data: files, error } = await supabaseClient.storage.from('documenti-cantieri').list(nomeImpresaUtente, { limit: 50, sortBy: { column: 'created_at', order: 'desc' } });
 
-                const { data: storici, error } = await supabaseClient
-                    .from('storico_audit')
-                    .select('*')
-                    .eq('user_id', session.user.id)
-                    .order('created_at', { ascending: false });
-
-                if (error || !storici || storici.length === 0) {
-                    container.innerHTML = '<p class="text-slate-400 py-2 text-center">Nessun audit registrato.</p>';
+                if (error || !files || files.length === 0) {
+                    container.innerHTML = '<p class="text-slate-400 py-2 text-center">Nessun file archiviato.</p>';
                     return;
                 }
 
                 container.innerHTML = '';
-                for (const item of storici) {
-                    const dataObj = new Date(item.created_at);
+                for (const file of files) {
+                    if (file.name === '.emptyFolderPlaceholder') continue;
+                    const fullPath = `${nomeImpresaUtente}/${file.name}`;
+                    const { data: signedUrl } = await supabaseClient.storage.from('documenti-cantieri').createSignedUrl(fullPath, 3600);
+                    const pulito = file.name.includes('_') ? file.name.substring(file.name.indexOf('_') + 1) : file.name;
+
                     container.innerHTML += `
                         <div class="py-2 flex justify-between items-center hover:bg-slate-50 rounded px-1">
-                            <div>
-                                <span class="text-slate-700 font-medium block truncate max-w-[160px]">📄 ${item.file_name}</span>
-                                <span class="text-slate-400 text-[10px]">${dataObj.toLocaleDateString()} - <strong class="${item.stato_generale === 'CONFORME' ? 'text-emerald-600' : 'text-rose-600'}">${item.stato_generale}</strong></span>
+                            <span class="text-slate-700 truncate max-w-[140px]" title="${pulito}">📄 ${pulito}</span>
+                            <div class="flex items-center gap-1">
+                                ${signedUrl ? `<a href="${signedUrl.signedUrl}" target="_blank" class="text-[10px] bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-0.5 rounded font-semibold">Apri</a>` : ''}
+                                <button onclick="eliminaFileCloud('${fullPath}')" class="text-[10px] bg-rose-50 text-rose-600 hover:bg-rose-100 px-1.5 py-0.5 rounded font-semibold cursor-pointer" title="Elimina">🗑️</button>
                             </div>
-                            <button onclick="eliminaStorico('${item.id}')" class="text-[10px] bg-rose-50 text-rose-600 hover:bg-rose-100 px-2 py-1 rounded font-semibold cursor-pointer" title="Elimina dal registro">🗑️</button>
                         </div>
                     `;
                 }
             } catch (err) {
-                container.innerHTML = `<p class="text-rose-500 py-2 text-center">Errore caricamento storico.</p>`;
+                container.innerHTML = `<p class="text-rose-500 py-2 text-center">Errore caricamento file.</p>`;
             }
         }
 
-        window.eliminaStorico = async function(id) {
-            if (!confirm("Vuoi rimuovere questo record dallo storico?")) return;
-            await supabaseClient.from('storico_audit').delete().eq('id', id);
-            caricaStoricoAudit();
+        window.eliminaFileCloud = async function(path) {
+            if (!confirm("Eliminare definitivamente questo file dal cloud?")) return;
+            await supabaseClient.storage.from('documenti-cantieri').remove([path]);
+            caricaFileManagerCloud();
         };
 
-        document.getElementById('btnRefreshManager').addEventListener('click', caricaStoricoAudit);
+        document.getElementById('btnRefreshManager').addEventListener('click', caricaFileManagerCloud);
 
         async function mostraDashboard(userId) {
             loginView.classList.add('hidden');
             dashboardView.classList.remove('hidden');
-            await caricaStoricoAudit();
+
+            const { data: profilo } = await supabaseClient.from('profili').select('piu_attivo, nome_impresa, scansioni_effettuate').eq('id', userId).single();
+            
+            utentePlus = profilo?.piu_attivo === true;
+            nomeImpresaUtente = (profilo?.nome_impresa || "Impresa_Generica").replace(/[^a-zA-Z0-9]/g, "_");
+
+            const badge = document.getElementById('pianoBadge');
+            if (utentePlus) {
+                badge.className = "bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full font-semibold";
+                badge.innerText = "Piano: EdilSafe+ (Illimitato + Cloud)";
+            } else {
+                const rimanenti = Math.max(0, 5 - (profilo?.scansioni_effettuate || 0));
+                badge.className = "bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1 rounded-full font-semibold";
+                badge.innerText = `Piano: Free (${rimanenti}/5 Scansioni)`;
+            }
         }
 
         document.getElementById('btnLogin').addEventListener('click', async () => {
@@ -278,6 +294,8 @@
                 document.getElementById('loading').classList.add('hidden');
 
                 if (data.error) return alert('Errore: ' + data.error);
+
+                await mostraDashboard(session.user.id);
 
                 document.getElementById('results').classList.remove('hidden');
                 const banner = document.getElementById('statusBanner');
