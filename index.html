@@ -170,38 +170,64 @@
             authMessage.classList.add('hidden');
         });
 
-        // FILE MANAGER CLOUD (Solo per EdilSafe+)
         async function caricaFileManagerCloud() {
             const container = document.getElementById('fileManagerList');
-            container.innerHTML = '<p class="text-slate-400 py-2 text-center">Caricamento file...</p>';
+            container.innerHTML = '<p class="text-slate-400 py-4 text-center text-xs">Organizzazione file in corso...</p>';
 
             try {
-                const { data: files, error } = await supabaseClient.storage.from('documenti-cantieri').list(nomeImpresaUtente, { limit: 50, sortBy: { column: 'created_at', order: 'desc' } });
+                // Legge tutti i file della cartella dell'impresa
+                const { data: files, error } = await supabaseClient.storage.from('documenti-cantieri').list(nomeImpresaUtente, { limit: 100, sortBy: { column: 'created_at', order: 'desc' } });
 
                 if (error || !files || files.length === 0) {
-                    container.innerHTML = '<p class="text-slate-400 py-2 text-center">Nessun file archiviato.</p>';
+                    container.innerHTML = '<p class="text-slate-400 py-4 text-center text-xs">Nessun file archiviato nel cloud.</p>';
                     return;
                 }
 
                 container.innerHTML = '';
+                
+                // Raggruppa i file per categoria (leggendo il prefisso o il nome del file)
+                const categorie = { "POS": [], "DURC": [], "Formazione": [], "Altri Documenti": [] };
+
                 for (const file of files) {
                     if (file.name === '.emptyFolderPlaceholder') continue;
-                    const fullPath = `${nomeImpresaUtente}/${file.name}`;
-                    const { data: signedUrl } = await supabaseClient.storage.from('documenti-cantieri').createSignedUrl(fullPath, 3600);
-                    const pulito = file.name.includes('_') ? file.name.substring(file.name.indexOf('_') + 1) : file.name;
-
-                    container.innerHTML += `
-                        <div class="py-2 flex justify-between items-center hover:bg-slate-50 rounded px-1">
-                            <span class="text-slate-700 truncate max-w-[140px]" title="${pulito}">📄 ${pulito}</span>
-                            <div class="flex items-center gap-1">
-                                ${signedUrl ? `<a href="${signedUrl.signedUrl}" target="_blank" class="text-[10px] bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-0.5 rounded font-semibold">Apri</a>` : ''}
-                                <button onclick="eliminaFileCloud('${fullPath}')" class="text-[10px] bg-rose-50 text-rose-600 hover:bg-rose-100 px-1.5 py-0.5 rounded font-semibold cursor-pointer" title="Elimina">🗑️</button>
-                            </div>
-                        </div>
-                    `;
+                    
+                    const nomeUpper = file.name.toUpperCase();
+                    if (nomeUpper.includes('POS')) categorie['POS'].push(file);
+                    else if (nomeUpper.includes('DURC')) categorie['DURC'].push(file);
+                    else if (nomeUpper.includes('CORSO') || nomeUpper.includes('ATTESTATO') || nomeUpper.includes('FORMAZIONE')) categorie['Formazione'].push(file);
+                    else categorie['Altri Documenti'].push(file);
                 }
+
+                let htmlContent = '';
+                for (const [cat, lista] of Object.entries(categorie)) {
+                    if (lista.length === 0) continue;
+                    
+                    htmlContent += `<div class="pt-2 pb-1 font-bold text-blue-700 text-xs border-b border-slate-100 uppercase tracking-wider">📁 ${cat} (${lista.length})</div>`;
+                    
+                    for (const file of lista) {
+                        const fullPath = `${nomeImpresaUtente}/${file.name}`;
+                        const { data: signedUrl } = await supabaseClient.storage.from('documenti-cantieri').createSignedUrl(fullPath, 3600);
+                        const pulito = file.name.includes('_') ? file.name.substring(file.name.indexOf('_') + 1) : file.name;
+                        const dataCaricamento = new Date(file.created_at).toLocaleDateString();
+
+                        htmlContent += `
+                            <div class="py-2 pl-2 flex justify-between items-center hover:bg-slate-50 rounded">
+                                <div class="overflow-hidden pr-2">
+                                    <span class="text-slate-700 font-medium truncate block max-w-[150px]" title="${pulito}">📄 ${pulito}</span>
+                                    <span class="text-slate-400 text-[9px]">${dataCaricamento}</span>
+                                </div>
+                                <div class="flex items-center gap-1 shrink-0">
+                                    ${signedUrl ? `<a href="${signedUrl.signedUrl}" target="_blank" class="text-[10px] bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-1 rounded font-semibold">Apri</a>` : ''}
+                                    <button onclick="eliminaFileCloud('${fullPath}')" class="text-[10px] bg-rose-50 text-rose-600 hover:bg-rose-100 px-1.5 py-1 rounded font-semibold cursor-pointer" title="Elimina">🗑️</button>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+
+                container.innerHTML = htmlContent || '<p class="text-slate-400 py-4 text-center text-xs">Nessun file trovato.</p>';
             } catch (err) {
-                container.innerHTML = `<p class="text-rose-500 py-2 text-center">Errore caricamento file.</p>`;
+                container.innerHTML = `<p class="text-rose-500 py-2 text-center text-xs">Errore caricamento archivio.</p>`;
             }
         }
 
