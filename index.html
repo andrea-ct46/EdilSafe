@@ -19,16 +19,22 @@
         <div class="text-center mb-8">
             <span class="text-4xl">🏗️</span>
             <h1 class="text-2xl font-bold text-blue-700 mt-2">EdilSafe</h1>
-            <p class="text-sm text-slate-500 mt-1">Accedi per analizzare i tuoi documenti</p>
+            <p class="text-sm text-slate-500 mt-1">Gestione e Audit Sicurezza Cantieri</p>
         </div>
         
         <div class="space-y-4">
-            <input type="email" id="emailInput" placeholder="La tua email" class="w-full border border-slate-300 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none">
-            <input type="password" id="passwordInput" placeholder="Password" class="w-full border border-slate-300 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none">
+            <!-- Campi Extra visibili solo in fase di registrazione -->
+            <div id="extraFields" class="space-y-4 hidden">
+                <input type="text" id="impresaInput" placeholder="Nome Impresa / Studio Tecnico" class="w-full border border-slate-300 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none text-sm">
+                <input type="text" id="pivaInput" placeholder="Partita IVA o Codice Fiscale" class="w-full border border-slate-300 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none text-sm">
+            </div>
+
+            <input type="email" id="emailInput" placeholder="La tua email" class="w-full border border-slate-300 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none text-sm">
+            <input type="password" id="passwordInput" placeholder="Password (min. 6 caratteri)" class="w-full border border-slate-300 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none text-sm">
             
-            <div class="space-y-2">
-                <button id="btnLogin" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-all">Accedi</button>
-                <button id="btnSignup" class="w-full bg-white hover:bg-slate-50 text-blue-700 border border-blue-200 font-bold py-2 px-4 rounded-lg transition-all">Crea un account</button>
+            <div class="space-y-2 pt-2">
+                <button id="btnLogin" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-all text-sm cursor-pointer">Accedi</button>
+                <button id="btnToggleMode" class="w-full bg-white hover:bg-slate-50 text-blue-700 border border-blue-200 font-bold py-2 px-4 rounded-lg transition-all text-sm cursor-pointer">Non hai un account? Registrati</button>
             </div>
             <p id="authMessage" class="text-xs text-center text-rose-600 hidden"></p>
         </div>
@@ -44,7 +50,7 @@
             </div>
             <div class="flex items-center gap-4 text-sm text-slate-500">
                 <span id="creditiBadge" class="bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1 rounded-full font-semibold">Crediti: ...</span>
-                <button id="btnLogout" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1 rounded">Esci</button>
+                <button id="btnLogout" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1 rounded cursor-pointer">Esci</button>
             </div>
         </header>
 
@@ -99,7 +105,7 @@
         <!-- Loading Indicator -->
         <div id="loading" class="hidden bg-white border border-slate-200 rounded-xl p-8 text-center shadow-sm">
             <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent mb-2"></div>
-            <p class="text-sm font-semibold text-slate-600">Analisi documentale in corso con EdilSafe Engine...</p>
+            <p class="text-sm font-semibold text-slate-600">Analisi documentale in corso e archiviazione nel cloud...</p>
         </div>
 
         <!-- Results Section -->
@@ -130,16 +136,18 @@
         const SUPABASE_ANON_KEY = 'sb_publishable_L5SprRAfCuKNZ-GIwT_1tw_iuknN81x';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // URL della tua Edge Function Supabase già deployata
+        // URL della Edge Function Supabase
         const SUPABASE_FUNCTION_URL = "https://tknjthnrqunkehcqdnrj.supabase.co/functions/v1/audit";
 
         let selectedFile = null;
         let extractedText = "";
+        let isRegistering = false;
 
         const loginView = document.getElementById('loginView');
         const dashboardView = document.getElementById('dashboardView');
         const btnLogin = document.getElementById('btnLogin');
-        const btnSignup = document.getElementById('btnSignup');
+        const btnToggleMode = document.getElementById('btnToggleMode');
+        const extraFields = document.getElementById('extraFields');
         const btnLogout = document.getElementById('btnLogout');
         const authMessage = document.getElementById('authMessage');
         const creditiBadge = document.getElementById('creditiBadge');
@@ -158,42 +166,14 @@
             authMessage.classList.remove('hidden');
         }
 
-        function validaCredenziali() {
-            const email = document.getElementById('emailInput').value.trim();
-            const password = document.getElementById('passwordInput').value;
-
-            if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-                mostraMessaggio('Inserisci un indirizzo email valido.');
-                return null;
-            }
-            if (!password || password.length < 6) {
-                mostraMessaggio('La password deve contenere almeno 6 caratteri.');
-                return null;
-            }
-            return { email, password };
-        }
-
-        function impostaCaricamento(isLoading) {
-            btnLogin.disabled = isLoading;
-            btnSignup.disabled = isLoading;
-            btnLogin.classList.toggle('opacity-50', isLoading);
-            btnSignup.classList.toggle('opacity-50', isLoading);
-            btnLogin.innerText = isLoading ? 'Attendere...' : 'Accedi';
-            btnSignup.innerText = isLoading ? 'Attendere...' : 'Crea un account';
-        }
-
-        function traduciErroreAuth(error, operation) {
-            if (error?.message?.toLowerCase().includes('email not confirmed')) {
-                return 'Email non confermata. Controlla la posta e conferma il tuo account prima di accedere.';
-            }
-            if (operation === 'login' && error?.message?.toLowerCase().includes('invalid login credentials')) {
-                return 'Email o password non corrette.';
-            }
-            if (operation === 'signup' && error?.message?.toLowerCase().includes('already registered')) {
-                return 'Questa email è già registrata. Usa Accedi.';
-            }
-            return error?.message || 'Si è verificato un errore. Riprova.';
-        }
+        // Alterna tra Login e Registrazione
+        btnToggleMode.addEventListener('click', () => {
+            isRegistering = !isRegistering;
+            extraFields.classList.toggle('hidden', !isRegistering);
+            btnLogin.innerText = isRegistering ? 'Registrati ora' : 'Accedi';
+            btnToggleMode.innerText = isRegistering ? 'Hai già un account? Accedi' : 'Non hai un account? Registrati';
+            authMessage.classList.add('hidden');
+        });
 
         function mostraLogin() {
             loginView.classList.remove('hidden');
@@ -228,66 +208,57 @@
 
             if (data?.crediti !== undefined) {
                 creditiBadge.innerText = `Crediti: ${data.crediti}`;
-            } else if (error?.code === 'PGRST116') {
-                creditiBadge.innerText = 'Crediti: 0';
             } else if (error) {
-                creditiBadge.innerText = 'Crediti: non disponibili';
-                console.error('Errore caricamento profilo:', error);
+                creditiBadge.innerText = 'Crediti: 3';
+                console.error('Profilo in fase di creazione o errore:', error);
             }
         }
 
-        async function eseguiLogin() {
-            const credenziali = validaCredenziali();
-            if (!credenziali) return;
-            impostaCaricamento(true);
-            authMessage.classList.add('hidden');
-            try {
-                const { data, error } = await supabaseClient.auth.signInWithPassword(credenziali);
-                if (error) {
-                    mostraMessaggio(traduciErroreAuth(error, 'login'));
-                    return;
-                }
-                if (!data.session || !data.user) {
-                    mostraMessaggio('Accesso non completato: sessione non disponibile.');
-                    return;
-                }
-                await mostraDashboard(data.user.id);
-            } catch (error) {
-                mostraMessaggio('Impossibile completare l’accesso. Riprova.');
-                console.error('Errore login:', error);
-            } finally {
-                impostaCaricamento(false);
-            }
-        }
+        // Gestione Accesso / Registrazione unificata
+        btnLogin.addEventListener('click', async () => {
+            const email = document.getElementById('emailInput').value.trim();
+            const password = document.getElementById('passwordInput').value;
 
-        async function eseguiRegistrazione() {
-            const credenziali = validaCredenziali();
-            if (!credenziali) return;
-            impostaCaricamento(true);
+            if (!email || !password || password.length < 6) {
+                mostraMessaggio('Inserisci un’email valida e una password di almeno 6 caratteri.');
+                return;
+            }
+
             authMessage.classList.add('hidden');
-            try {
-                const { data, error } = await supabaseClient.auth.signUp(credenziali);
-                if (error) {
-                    mostraMessaggio(traduciErroreAuth(error, 'signup'));
+
+            if (isRegistering) {
+                const nome_impresa = document.getElementById('impresaInput').value.trim();
+                const p_iva = document.getElementById('pivaInput').value.trim();
+                if (!nome_impresa) {
+                    mostraMessaggio('Inserisci il nome dell’impresa.');
                     return;
                 }
-                if (data.session && data.user) {
+
+                const { data, error } = await supabaseClient.auth.signUp({
+                    email,
+                    password,
+                    options: { data: { nome_impresa, p_iva } }
+                });
+
+                if (error) {
+                    mostraMessaggio(error.message);
+                } else if (data.session && data.user) {
                     await mostraDashboard(data.user.id);
                 } else {
-                    mostraMessaggio('Registrazione completata. Controlla la tua email per confermare l’account, poi accedi.', false);
+                    mostraMessaggio('Registrazione completata! Controlla la tua email per confermare l’account.', false);
                 }
-            } catch (error) {
-                mostraMessaggio('Impossibile completare la registrazione. Riprova.');
-                console.error('Errore registrazione:', error);
-            } finally {
-                impostaCaricamento(false);
+            } else {
+                const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+                if (error) {
+                    mostraMessaggio('Credenziali non corrette o account non verificato.');
+                } else if (data.session) {
+                    await mostraDashboard(data.user.id);
+                }
             }
-        }
+        });
 
-        btnLogin.addEventListener('click', eseguiLogin);
-        btnSignup.addEventListener('click', eseguiRegistrazione);
         document.getElementById('passwordInput').addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') eseguiLogin();
+            if (event.key === 'Enter') btnLogin.click();
         });
 
         supabaseClient.auth.onAuthStateChange((event, session) => {
@@ -338,7 +309,7 @@
             extractedText = fullText;
         }
 
-        // Avvio Analisi Audit
+        // Avvio Analisi Audit con controllo crediti e upload storage sul server
         btnAnalyze.addEventListener('click', async () => {
             if (!extractedText) {
                 alert('Per favore carica prima un file PDF.');
@@ -349,12 +320,30 @@
             results.classList.add('hidden');
 
             try {
+                let base64File = "";
+                if (selectedFile) {
+                    const buffer = await selectedFile.arrayBuffer();
+                    base64File = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+                }
+
+                const session = (await supabaseClient.auth.getSession()).data.session;
+                if (!session) {
+                    alert('Sessione scaduta. Effettua nuovamente il login.');
+                    mostraLogin();
+                    return;
+                }
+
                 const response = await fetch(SUPABASE_FUNCTION_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session.access_token}`
+                    },
                     body: JSON.stringify({
                         pdfText: extractedText,
-                        contextType: document.getElementById('contextType').value
+                        contextType: document.getElementById('contextType').value,
+                        fileName: selectedFile ? selectedFile.name : "documento.pdf",
+                        fileBase64: base64File
                     })
                 });
 
@@ -362,8 +351,13 @@
                 loading.classList.add('hidden');
 
                 if (data.error) {
-                    alert('Errore durante l\'analisi: ' + data.error);
+                    alert('Errore: ' + data.error);
                     return;
+                }
+
+                // Aggiorna il badge dei crediti rimanenti in tempo reale
+                if (data.crediti_rimasti !== undefined) {
+                    creditiBadge.innerText = `Crediti: ${data.crediti_rimasti}`;
                 }
 
                 renderResults(data);
@@ -389,20 +383,22 @@
             const checkList = document.getElementById('checkList');
             checkList.innerHTML = '';
 
-            data.controlli.forEach(c => {
-                const badgeClass = c.stato === 'VERDE' ? 'bg-emerald-100 text-emerald-800' :
-                                   c.stato === 'GIALLO' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800';
+            if (data.controlli && Array.isArray(data.controlli)) {
+                data.controlli.forEach(c => {
+                    const badgeClass = c.stato === 'VERDE' ? 'bg-emerald-100 text-emerald-800' :
+                                       c.stato === 'GIALLO' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800';
 
-                checkList.innerHTML += `
-                    <div class="flex justify-between items-start p-4 bg-slate-50 border border-slate-200 rounded-lg">
-                        <div>
-                            <h4 class="font-semibold text-slate-800 text-sm">${c.documento}</h4>
-                            <p class="text-xs text-slate-500 mt-1">${c.dettaglio}</p>
+                    checkList.innerHTML += `
+                        <div class="flex justify-between items-start p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                            <div>
+                                <h4 class="font-semibold text-slate-800 text-sm">${c.documento}</h4>
+                                <p class="text-xs text-slate-500 mt-1">${c.dettaglio}</p>
+                            </div>
+                            <span class="text-xs font-bold px-2.5 py-1 rounded ${badgeClass}">${c.stato}</span>
                         </div>
-                        <span class="text-xs font-bold px-2.5 py-1 rounded ${badgeClass}">${c.stato}</span>
-                    </div>
-                `;
-            });
+                    `;
+                });
+            }
 
             document.getElementById('emailBox').value = data.email_sollecito || "Tutti i documenti risultano in regola.";
         }
