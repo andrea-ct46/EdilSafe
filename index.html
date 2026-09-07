@@ -5,16 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EdilSafe - Audit Documentale Cantiere</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <!-- Libreria ufficiale di Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script>
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    </script>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans min-h-screen">
 
-    <!-- SCHERMATA DI LOGIN / REGISTRAZIONE -->
+    <!-- LOGIN / REGISTRAZIONE -->
     <div id="loginView" class="max-w-md mx-auto mt-20 p-8 bg-white border border-slate-200 rounded-xl shadow-sm">
         <div class="text-center mb-8">
             <span class="text-4xl">🏗️</span>
@@ -23,12 +18,10 @@
         </div>
         
         <div class="space-y-4">
-            <!-- Campi Extra visibili solo in fase di registrazione -->
             <div id="extraFields" class="space-y-4 hidden">
                 <input type="text" id="impresaInput" placeholder="Nome Impresa / Studio Tecnico" class="w-full border border-slate-300 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none text-sm">
                 <input type="text" id="pivaInput" placeholder="Partita IVA o Codice Fiscale" class="w-full border border-slate-300 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none text-sm">
             </div>
-
             <input type="email" id="emailInput" placeholder="La tua email" class="w-full border border-slate-300 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none text-sm">
             <input type="password" id="passwordInput" placeholder="Password (min. 6 caratteri)" class="w-full border border-slate-300 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none text-sm">
             
@@ -40,9 +33,8 @@
         </div>
     </div>
 
-    <!-- DASHBOARD PRINCIPALE -->
+    <!-- DASHBOARD -->
     <div id="dashboardView" class="max-w-5xl mx-auto p-6 space-y-6 hidden">
-        
         <header class="flex justify-between items-center bg-white border border-slate-200 p-4 rounded-xl shadow-sm">
             <div class="flex items-center gap-2">
                 <span class="text-2xl">🏗️</span>
@@ -54,16 +46,14 @@
             </div>
         </header>
 
-        <!-- Input Grid -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            
             <!-- Upload Box -->
             <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
                 <h2 class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">1. Carica Documento Cantiere</h2>
                 <div id="dropZone" class="border-2 border-dashed border-slate-200 hover:border-blue-500 bg-slate-50 hover:bg-blue-50/50 rounded-lg p-8 text-center cursor-pointer transition-all">
                     <input type="file" id="fileInput" accept=".pdf" class="hidden">
                     <div class="text-3xl mb-2">📄</div>
-                    <p class="font-semibold text-slate-700">Trascina qui il file PDF dell'Impresa</p>
+                    <p class="font-semibold text-slate-700">Trascina qui il file PDF</p>
                     <p class="text-xs text-slate-400 mt-1">oppure seleziona un file dal computer</p>
                     <p id="fileName" class="text-xs text-blue-600 font-medium mt-3 hidden"></p>
                 </div>
@@ -73,310 +63,228 @@
             <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm flex flex-col justify-between">
                 <div>
                     <h2 class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">2. Configurazione Contesto</h2>
-                    
-                    <div class="mb-4">
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">Tipologia Lavori</label>
-                        <select id="contextType" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:border-blue-500">
-                            <option value="Ristrutturazione Edilizia con Ponteggio">Ristrutturazione Edilizia con Ponteggio</option>
-                            <option value="Nuova Costruzione / Scavi">Nuova Costruzione / Scavi</option>
-                            <option value="Impiantistica e Manutenzione">Impiantistica e Manutenzione</option>
-                        </select>
-                    </div>
-
+                    <select id="contextType" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 mb-4 focus:outline-none focus:border-blue-500">
+                        <option value="Ristrutturazione Edilizia con Ponteggio">Ristrutturazione Edilizia con Ponteggio</option>
+                        <option value="Nuova Costruzione / Scavi">Nuova Costruzione / Scavi</option>
+                        <option value="Impiantistica e Manutenzione">Impiantistica e Manutenzione</option>
+                    </select>
                     <div class="space-y-2">
                         <label class="block text-xs font-semibold text-slate-500">Verifiche Attive</label>
-                        <label class="flex items-center gap-2 text-sm text-slate-600">
-                            <input type="checkbox" checked disabled class="rounded text-blue-600"> D.Lgs 81/08 - Allegato XVII (Idoneità)
-                        </label>
-                        <label class="flex items-center gap-2 text-sm text-slate-600">
-                            <input type="checkbox" checked disabled class="rounded text-blue-600"> Controllo Scadenze (DURC, Visite, Attestati)
-                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked disabled class="rounded text-blue-600"> D.Lgs 81/08 - Allegato XVII (Idoneità)</label>
+                        <label class="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked disabled class="rounded text-blue-600"> Controllo Scadenze (DURC, Visite, Attestati)</label>
                     </div>
                 </div>
             </div>
-
         </div>
 
-        <!-- Submit Button -->
-        <button id="btnAnalyze" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all disabled:opacity-50 flex justify-center items-center gap-2 cursor-pointer">
+        <button id="btnAnalyze" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer">
             <span>⚡ AVVIA AUDIT DOCUMENTALE</span>
         </button>
 
-        <!-- Loading Indicator -->
         <div id="loading" class="hidden bg-white border border-slate-200 rounded-xl p-8 text-center shadow-sm">
             <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent mb-2"></div>
-            <p class="text-sm font-semibold text-slate-600">Analisi documentale in corso e archiviazione nel cloud...</p>
+            <p class="text-sm font-semibold text-slate-600">Analisi e archiviazione nel cloud in corso...</p>
         </div>
 
-        <!-- Results Section -->
         <div id="results" class="hidden bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-6">
             <h2 class="text-lg font-bold text-slate-800">Report di Conformità Documentale</h2>
-
-            <!-- Overall Status Banner -->
             <div id="statusBanner" class="p-4 rounded-lg font-bold flex items-center gap-2"></div>
-
-            <!-- Checks List -->
             <div id="checkList" class="space-y-3"></div>
-
-            <!-- Email Box -->
             <div class="border-t border-slate-100 pt-4">
                 <h3 class="text-sm font-semibold text-slate-700 mb-2">✉️ Bozza Email di Sollecito Precompilata</h3>
                 <textarea id="emailBox" readonly class="w-full h-28 bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-700 focus:outline-none resize-none"></textarea>
-                <button id="btnCopyEmail" class="mt-2 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 px-4 rounded-lg transition-all cursor-pointer">
-                    📋 Copia Testo Email
-                </button>
             </div>
         </div>
 
+        <!-- NUOVO: SEZIONE CARTELLA ARCHIVIO -->
+        <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-sm font-semibold text-slate-500 uppercase tracking-wider">📁 Archivio Documenti Impresa</h2>
+                <button id="btnRefreshCartella" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 py-1 px-3 rounded cursor-pointer font-semibold">Aggiorna Lista</button>
+            </div>
+            <div id="fileFolderList" class="divide-y divide-slate-100 text-sm max-h-60 overflow-y-auto">
+                <p class="text-slate-400 text-xs py-2">Caricamento archivio in corso...</p>
+            </div>
+        </div>
     </div>
 
     <script>
+        // INSERISCI QUI LE TUE CHIAVI
         const SUPABASE_URL = 'https://tknjthnrqunkehcqdnrj.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_L5SprRAfCuKNZ-GIwT_1tw_iuknN81x';
+        
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        const SUPABASE_FUNCTION_URL = "https://tknjthnrqunkehcqdnrj.supabase.co/functions/v1/audit";
+        const SUPABASE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/audit`;
 
         let selectedFile = null;
         let isRegistering = false;
 
         const loginView = document.getElementById('loginView');
         const dashboardView = document.getElementById('dashboardView');
-        const btnLogin = document.getElementById('btnLogin');
-        const btnToggleMode = document.getElementById('btnToggleMode');
-        const extraFields = document.getElementById('extraFields');
-        const btnLogout = document.getElementById('btnLogout');
         const authMessage = document.getElementById('authMessage');
         const creditiBadge = document.getElementById('creditiBadge');
-
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');
-        const fileNameDisplay = document.getElementById('fileName');
-        const btnAnalyze = document.getElementById('btnAnalyze');
-        const loading = document.getElementById('loading');
-        const results = document.getElementById('results');
 
         function mostraMessaggio(message, isError = true) {
             authMessage.innerText = message;
-            authMessage.classList.toggle('text-rose-600', isError);
-            authMessage.classList.toggle('text-emerald-600', !isError);
+            authMessage.className = `text-xs text-center mt-2 ${isError ? 'text-rose-600' : 'text-emerald-600'}`;
             authMessage.classList.remove('hidden');
         }
 
-        btnToggleMode.addEventListener('click', () => {
+        document.getElementById('btnToggleMode').addEventListener('click', () => {
             isRegistering = !isRegistering;
-            extraFields.classList.toggle('hidden', !isRegistering);
-            btnLogin.innerText = isRegistering ? 'Registrati ora' : 'Accedi';
-            btnToggleMode.innerText = isRegistering ? 'Hai già un account? Accedi' : 'Non hai un account? Registrati';
+            document.getElementById('extraFields').classList.toggle('hidden', !isRegistering);
+            document.getElementById('btnLogin').innerText = isRegistering ? 'Registrati ora' : 'Accedi';
+            document.getElementById('btnToggleMode').innerText = isRegistering ? 'Hai già un account? Accedi' : 'Non hai un account? Registrati';
             authMessage.classList.add('hidden');
         });
 
-        function mostraLogin() {
-            loginView.classList.remove('hidden');
-            dashboardView.classList.add('hidden');
-        }
-
-        async function checkSession() {
+        async function caricaCartellaArchivio() {
+            const fileFolderList = document.getElementById('fileFolderList');
+            fileFolderList.innerHTML = '<p class="text-slate-400 text-xs py-2">Aggiornamento in corso...</p>';
+            
             try {
-                const { data: { session }, error } = await supabaseClient.auth.getSession();
-                if (error) throw error;
-                if (session?.user) {
-                    await mostraDashboard(session.user.id);
-                } else {
-                    mostraLogin();
+                const session = (await supabaseClient.auth.getSession()).data.session;
+                if (!session) return;
+
+                const { data: profilo } = await supabaseClient.from('profili').select('nome_impresa').eq('id', session.user.id).single();
+                const nomeCartella = (profilo?.nome_impresa || "Impresa_Generica").replace(/[^a-zA-Z0-9]/g, "_");
+
+                const { data: files, error } = await supabaseClient.storage.from('documenti-cantieri').list(nomeCartella, { sortBy: { column: 'created_at', order: 'desc' } });
+                
+                if (error || !files || files.length === 0) {
+                    fileFolderList.innerHTML = '<p class="text-slate-400 text-xs py-2">La cartella è vuota. Fai un audit per salvare il primo documento.</p>';
+                    return;
                 }
-            } catch (error) {
-                mostraLogin();
+
+                fileFolderList.innerHTML = '';
+                for (const file of files) {
+                    if (file.name === '.emptyFolderPlaceholder') continue;
+                    
+                    const { data: signedUrl } = await supabaseClient.storage.from('documenti-cantieri').createSignedUrl(`${nomeCartella}/${file.name}`, 3600);
+                    const nomePulito = file.name.includes('_') ? file.name.substring(file.name.indexOf('_') + 1) : file.name;
+                    const dateObj = new Date(file.created_at);
+
+                    fileFolderList.innerHTML += `
+                        <div class="flex justify-between items-center py-3">
+                            <div>
+                                <span class="text-slate-700 font-medium text-xs block">📄 ${nomePulito}</span>
+                                <span class="text-slate-400 text-[10px]">${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString()}</span>
+                            </div>
+                            ${signedUrl ? `<a href="${signedUrl.signedUrl}" target="_blank" class="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 py-1.5 px-3 rounded font-semibold transition-colors">Apri / Scarica</a>` : ''}
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                fileFolderList.innerHTML = `<p class="text-rose-500 text-xs py-2">Errore caricamento archivio: ${err.message}</p>`;
             }
         }
+
+        document.getElementById('btnRefreshCartella').addEventListener('click', caricaCartellaArchivio);
 
         async function mostraDashboard(userId) {
             loginView.classList.add('hidden');
             dashboardView.classList.remove('hidden');
 
-            creditiBadge.innerText = 'Crediti: ...';
-            const { data } = await supabaseClient
-                .from('profili')
-                .select('crediti')
-                .eq('id', userId)
-                .single();
-
-            if (data?.crediti !== undefined) {
-                creditiBadge.innerText = `Crediti: ${data.crediti}`;
-            } else {
-                creditiBadge.innerText = 'Crediti: 3';
-            }
+            const { data } = await supabaseClient.from('profili').select('crediti').eq('id', userId).single();
+            creditiBadge.innerText = `Crediti: ${data?.crediti !== undefined ? data.crediti : '...'}`;
+            
+            await caricaCartellaArchivio();
         }
 
-        btnLogin.addEventListener('click', async () => {
+        document.getElementById('btnLogin').addEventListener('click', async () => {
             const email = document.getElementById('emailInput').value.trim();
             const password = document.getElementById('passwordInput').value;
 
-            if (!email || !password || password.length < 6) {
-                mostraMessaggio('Inserisci email valida e password (min. 6 caratteri).');
-                return;
-            }
-
-            authMessage.classList.add('hidden');
+            if (!email || !password || password.length < 6) return mostraMessaggio('Dati non validi (pass min. 6).');
 
             if (isRegistering) {
                 const nome_impresa = document.getElementById('impresaInput').value.trim();
                 const p_iva = document.getElementById('pivaInput').value.trim();
-                if (!nome_impresa) {
-                    mostraMessaggio('Inserisci il nome dell’impresa.');
-                    return;
-                }
+                if (!nome_impresa) return mostraMessaggio('Inserisci nome impresa.');
 
-                const { data, error } = await supabaseClient.auth.signUp({
-                    email,
-                    password,
-                    options: { data: { nome_impresa, p_iva } }
-                });
-
-                if (error) {
-                    mostraMessaggio(error.message);
-                } else if (data.session && data.user) {
-                    await mostraDashboard(data.user.id);
-                } else {
-                    mostraMessaggio('Registrazione completata! Controlla la tua email.', false);
-                }
+                const { data, error } = await supabaseClient.auth.signUp({ email, password, options: { data: { nome_impresa, p_iva } } });
+                if (error) mostraMessaggio(error.message);
+                else if (data.session) mostraDashboard(data.user.id);
+                else mostraMessaggio('Registrazione ok! Conferma l\'email.', false);
             } else {
                 const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-                if (error) {
-                    mostraMessaggio('Credenziali non corrette.');
-                } else if (data.session) {
-                    await mostraDashboard(data.user.id);
-                }
+                if (error) mostraMessaggio('Credenziali errate.');
+                else if (data.session) mostraDashboard(data.user.id);
             }
         });
 
-        document.getElementById('passwordInput').addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') btnLogin.click();
-        });
-
-        btnLogout.addEventListener('click', async () => {
+        document.getElementById('btnLogout').addEventListener('click', async () => {
             await supabaseClient.auth.signOut();
-            mostraLogin();
+            loginView.classList.remove('hidden');
+            dashboardView.classList.add('hidden');
         });
 
-        // Gestione PDF sicura senza parsing locale pesante
+        // Gestione File
         dropZone.addEventListener('click', () => fileInput.click());
         dropZone.addEventListener('dragover', (e) => e.preventDefault());
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
-        });
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length) handleFile(e.target.files[0]);
-        });
+        dropZone.addEventListener('drop', (e) => { e.preventDefault(); handleFile(e.dataTransfer.files[0]); });
+        fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
 
         function handleFile(file) {
-            if (file.type !== 'application/pdf') {
-                alert('Seleziona un file PDF valido.');
-                return;
-            }
+            if (file.type !== 'application/pdf') return alert('Seleziona un PDF.');
             selectedFile = file;
-            fileNameDisplay.innerText = `File selezionato: ${file.name}`;
-            fileNameDisplay.classList.remove('hidden');
+            document.getElementById('fileName').innerText = `Selezionato: ${file.name}`;
+            document.getElementById('fileName').classList.remove('hidden');
         }
 
-        // Avvio Analisi Audit inviando direttamente il file al server
-        btnAnalyze.addEventListener('click', async () => {
-            if (!selectedFile) {
-                alert('Carica prima un file PDF.');
-                return;
-            }
-
-            loading.classList.remove('hidden');
-            results.classList.add('hidden');
+        // Avvio Analisi
+        document.getElementById('btnAnalyze').addEventListener('click', async () => {
+            if (!selectedFile) return alert('Carica un PDF.');
+            
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('results').classList.add('hidden');
 
             try {
                 const buffer = await selectedFile.arrayBuffer();
                 const base64File = btoa(String.fromCharCode(...new Uint8Array(buffer)));
-
                 const session = (await supabaseClient.auth.getSession()).data.session;
-                if (!session) {
-                    alert('Sessione scaduta. Effettua nuovamente il login.');
-                    mostraLogin();
-                    return;
-                }
-
+                
                 const response = await fetch(SUPABASE_FUNCTION_URL, {
                     method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${session.access_token}`
-                    },
-                    body: JSON.stringify({
-                        pdfText: "Documento PDF allegato in formato binario",
-                        contextType: document.getElementById('contextType').value,
-                        fileName: selectedFile.name,
-                        fileBase64: base64File
-                    })
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                    body: JSON.stringify({ contextType: document.getElementById('contextType').value, fileName: selectedFile.name, fileBase64: base64File })
                 });
 
                 const data = await response.json();
-                loading.classList.add('hidden');
+                document.getElementById('loading').classList.add('hidden');
 
-                if (data.error) {
-                    alert('Errore: ' + data.error);
-                    return;
-                }
+                if (data.error) return alert('Errore: ' + data.error);
 
-                if (data.crediti_rimasti !== undefined) {
-                    creditiBadge.innerText = `Crediti: ${data.crediti_rimasti}`;
-                }
+                // Aggiorna crediti e ricarica archivio per mostrare il file appena aggiunto!
+                await mostraDashboard(session.user.id);
 
-                renderResults(data);
+                // Renderizza Risultati
+                document.getElementById('results').classList.remove('hidden');
+                const banner = document.getElementById('statusBanner');
+                banner.className = `p-4 rounded-lg font-bold flex items-center gap-2 ${data.stato_generale === 'CONFORME' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`;
+                banner.innerText = `STATO GENERALE: ${data.stato_generale}`;
 
-            } catch (err) {
-                loading.classList.add('hidden');
-                alert('Errore di connessione al server: ' + err.message);
-            }
-        });
-
-        function renderResults(data) {
-            results.classList.remove('hidden');
-
-            const statusBanner = document.getElementById('statusBanner');
-            if (data.stato_generale === 'CONFORME') {
-                statusBanner.className = 'p-4 rounded-lg font-bold flex items-center gap-2 bg-emerald-50 text-emerald-700 border border-emerald-200';
-                statusBanner.innerText = '🟢 STATO GENERALE: CONFORME';
-            } else {
-                statusBanner.className = 'p-4 rounded-lg font-bold flex items-center gap-2 bg-rose-50 text-rose-700 border border-rose-200';
-                statusBanner.innerText = `🔴 STATO GENERALE: ${data.stato_generale}`;
-            }
-
-            const checkList = document.getElementById('checkList');
-            checkList.innerHTML = '';
-
-            if (data.controlli && Array.isArray(data.controlli)) {
-                data.controlli.forEach(c => {
-                    const badgeClass = c.stato === 'VERDE' ? 'bg-emerald-100 text-emerald-800' :
-                                       c.stato === 'GIALLO' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800';
-
-                    checkList.innerHTML += `
-                        <div class="flex justify-between items-start p-4 bg-slate-50 border border-slate-200 rounded-lg">
-                            <div>
-                                <h4 class="font-semibold text-slate-800 text-sm">${c.documento}</h4>
-                                <p class="text-xs text-slate-500 mt-1">${c.dettaglio}</p>
-                            </div>
-                            <span class="text-xs font-bold px-2.5 py-1 rounded ${badgeClass}">${c.stato}</span>
-                        </div>
-                    `;
+                const list = document.getElementById('checkList');
+                list.innerHTML = '';
+                (data.controlli || []).forEach(c => {
+                    const bCls = c.stato === 'VERDE' ? 'bg-emerald-100 text-emerald-800' : c.stato === 'GIALLO' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800';
+                    list.innerHTML += `<div class="flex justify-between items-start p-4 bg-slate-50 border border-slate-200 rounded-lg"><div><h4 class="font-semibold text-slate-800 text-sm">${c.documento}</h4><p class="text-xs text-slate-500 mt-1">${c.dettaglio}</p></div><span class="text-xs font-bold px-2.5 py-1 rounded ${bCls}">${c.stato}</span></div>`;
                 });
+
+                document.getElementById('emailBox').value = data.email_sollecito || "Tutto ok.";
+            } catch (err) {
+                document.getElementById('loading').classList.add('hidden');
+                alert('Errore connessione: ' + err.message);
             }
-
-            document.getElementById('emailBox').value = data.email_sollecito || "Tutti i documenti risultano in regola.";
-        }
-
-        document.getElementById('btnCopyEmail').addEventListener('click', () => {
-            const emailText = document.getElementById('emailBox');
-            emailText.select();
-            navigator.clipboard.writeText(emailText.value);
-            alert('Testo email copiato negli appunti!');
         });
 
-        checkSession();
+        // Avvio Controllo Sessione
+        (async function checkSession() {
+            const { data } = await supabaseClient.auth.getSession();
+            if (data?.session?.user) mostraDashboard(data.session.user.id);
+        })();
     </script>
 </body>
 </html>
