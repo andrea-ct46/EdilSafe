@@ -44,10 +44,10 @@
             <div class="flex items-center gap-4 text-sm text-slate-500">
                 <span id="pianoBadge" class="bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1 rounded-full font-semibold">Piano: Verificando...</span>
                 
-                <!-- MENU BURGER FILE MANAGER (RISERVATO A EDILSAFE+) -->
+                <!-- MENU BURGER FILE MANAGER (BLOCCATO SE FREE) -->
                 <div class="relative">
-                    <button id="btnBurger" class="bg-slate-100 hover:bg-slate-200 p-2 rounded-lg text-slate-700 cursor-pointer flex items-center gap-1 text-sm font-semibold">
-                        <span>📁 File Manager Plus</span>
+                    <button id="btnBurger" class="bg-slate-100 hover:bg-slate-200 p-2 rounded-lg text-slate-700 cursor-pointer flex items-center gap-1 text-sm font-semibold opacity-60" title="Riservato a EdilSafe+">
+                        <span>📁 File Manager Plus 🔒</span>
                         <span>▼</span>
                     </button>
                     
@@ -57,7 +57,7 @@
                             <button id="btnRefreshManager" class="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded cursor-pointer">Aggiorna</button>
                         </div>
                         <div id="fileManagerList" class="max-h-72 overflow-y-auto space-y-2 text-xs divide-y divide-slate-100">
-                            <p class="text-slate-400 py-2 text-center">Caricamento...</p>
+                            <p class="text-slate-400 py-2 text-center">Funzione non attiva nel piano Free.</p>
                         </div>
                     </div>
                 </div>
@@ -69,12 +69,12 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- Upload Box -->
             <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-                <h2 class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">1. Carica Documento Cantiere</h2>
+                <h2 class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">1. Carica Documenti Cantiere</h2>
                 <div id="dropZone" class="border-2 border-dashed border-slate-200 hover:border-blue-500 bg-slate-50 hover:bg-blue-50/50 rounded-lg p-8 text-center cursor-pointer transition-all">
-                    <input type="file" id="fileInput" accept=".pdf" class="hidden">
+                    <input type="file" id="fileInput" accept=".pdf" multiple class="hidden">
                     <div class="text-3xl mb-2">📄</div>
-                    <p class="font-semibold text-slate-700">Trascina qui il file PDF</p>
-                    <p class="text-xs text-slate-400 mt-1">oppure seleziona un file dal computer</p>
+                    <p class="font-semibold text-slate-700">Trascina qui i file PDF (anche multipli)</p>
+                    <p class="text-xs text-slate-400 mt-1">oppure seleziona i file dal computer</p>
                     <p id="fileName" class="text-xs text-blue-600 font-medium mt-3 hidden"></p>
                 </div>
             </div>
@@ -98,12 +98,12 @@
         </div>
 
         <button id="btnAnalyze" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer">
-            <span>⚡ AVVIA AUDIT DOCUMENTALE</span>
+            <span>⚡ AVVIA AUDIT DOCUMENTALE MASSIVO</span>
         </button>
 
         <div id="loading" class="hidden bg-white border border-slate-200 rounded-xl p-8 text-center shadow-sm">
             <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent mb-2"></div>
-            <p class="text-sm font-semibold text-slate-600">Analisi intelligente in corso...</p>
+            <p class="text-sm font-semibold text-slate-600">Analisi e archiviazione multipla in corso...</p>
         </div>
 
         <div id="results" class="hidden bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-6">
@@ -124,7 +124,7 @@
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         const SUPABASE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/audit`;
 
-        let selectedFile = null;
+        let selectedFiles = [];
         let isRegistering = false;
         let utentePlus = false;
         let nomeImpresaUtente = "";
@@ -171,11 +171,11 @@
         });
 
         async function caricaFileManagerCloud() {
+            if (!utentePlus) return;
             const container = document.getElementById('fileManagerList');
             container.innerHTML = '<p class="text-slate-400 py-4 text-center text-xs">Organizzazione file in corso...</p>';
 
             try {
-                // Legge tutti i file della cartella dell'impresa
                 const { data: files, error } = await supabaseClient.storage.from('documenti-cantieri').list(nomeImpresaUtente, { limit: 100, sortBy: { column: 'created_at', order: 'desc' } });
 
                 if (error || !files || files.length === 0) {
@@ -185,7 +185,6 @@
 
                 container.innerHTML = '';
                 
-                // Raggruppa i file per categoria (leggendo il prefisso o il nome del file)
                 const categorie = { "POS": [], "DURC": [], "Formazione": [], "Altri Documenti": [] };
 
                 for (const file of files) {
@@ -249,13 +248,19 @@
             nomeImpresaUtente = (profilo?.nome_impresa || "Impresa_Generica").replace(/[^a-zA-Z0-9]/g, "_");
 
             const badge = document.getElementById('pianoBadge');
+            const btnB = document.getElementById('btnBurger');
+
             if (utentePlus) {
                 badge.className = "bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full font-semibold";
                 badge.innerText = "Piano: EdilSafe+ (Illimitato + Cloud)";
+                btnB.classList.remove('opacity-60');
+                btnB.innerHTML = '<span>📁 File Manager Plus</span><span>▼</span>';
             } else {
                 const rimanenti = Math.max(0, 5 - (profilo?.scansioni_effettuate || 0));
                 badge.className = "bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1 rounded-full font-semibold";
                 badge.innerText = `Piano: Free (${rimanenti}/5 Scansioni)`;
+                btnB.classList.add('opacity-60');
+                btnB.innerHTML = '<span>📁 File Manager Plus 🔒</span><span>▼</span>';
             }
         }
 
@@ -289,53 +294,68 @@
 
         dropZone.addEventListener('click', () => fileInput.click());
         dropZone.addEventListener('dragover', (e) => e.preventDefault());
-        dropZone.addEventListener('drop', (e) => { e.preventDefault(); handleFile(e.dataTransfer.files[0]); });
-        fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+        dropZone.addEventListener('drop', (e) => { e.preventDefault(); handleFiles(e.dataTransfer.files); });
+        fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
 
-        function handleFile(file) {
-            if (file.type !== 'application/pdf') return alert('Seleziona un PDF.');
-            selectedFile = file;
-            document.getElementById('fileName').innerText = `Selezionato: ${file.name}`;
+        function handleFiles(files) {
+            selectedFiles = Array.from(files).filter(f => f.type === 'application/pdf');
+            if (selectedFiles.length === 0) return alert('Seleziona almeno un file PDF valido.');
+            
+            const fileNames = selectedFiles.map(f => f.name).join(', ');
+            document.getElementById('fileName').innerText = `Selezionati (${selectedFiles.length}): ${fileNames}`;
             document.getElementById('fileName').classList.remove('hidden');
         }
 
         document.getElementById('btnAnalyze').addEventListener('click', async () => {
-            if (!selectedFile) return alert('Carica un PDF.');
+            if (selectedFiles.length === 0) return alert('Carica almeno un PDF.');
             
             document.getElementById('loading').classList.remove('hidden');
             document.getElementById('results').classList.add('hidden');
 
             try {
-                const buffer = await selectedFile.arrayBuffer();
-                const base64File = btoa(String.fromCharCode(...new Uint8Array(buffer)));
                 const session = (await supabaseClient.auth.getSession()).data.session;
-                
-                const response = await fetch(SUPABASE_FUNCTION_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-                    body: JSON.stringify({ contextType: document.getElementById('contextType').value, fileName: selectedFile.name, fileBase64: base64File })
-                });
+                let risultatiGlobali = [];
 
-                const data = await response.json();
+                for (const file of selectedFiles) {
+                    const buffer = await file.arrayBuffer();
+                    const base64File = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+                    
+                    const response = await fetch(SUPABASE_FUNCTION_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                        body: JSON.stringify({ contextType: document.getElementById('contextType').value, fileName: file.name, fileBase64: base64File })
+                    });
+
+                    const data = await response.json();
+                    if (data.error) {
+                        alert(`Errore su ${file.name}: ${data.error}`);
+                        break;
+                    }
+                    risultatiGlobali.push({ nome: file.name, ...data });
+                }
+
                 document.getElementById('loading').classList.add('hidden');
-
-                if (data.error) return alert('Errore: ' + data.error);
-
                 await mostraDashboard(session.user.id);
+
+                if (risultatiGlobali.length === 0) return;
 
                 document.getElementById('results').classList.remove('hidden');
                 const banner = document.getElementById('statusBanner');
-                banner.className = `p-4 rounded-lg font-bold flex items-center gap-2 ${data.stato_generale === 'CONFORME' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`;
-                banner.innerText = `STATO GENERALE: ${data.stato_generale}`;
+                banner.className = `p-4 rounded-lg font-bold flex items-center gap-2 bg-blue-50 text-blue-700 border border-blue-200`;
+                banner.innerText = `AUDIT COMPLETATO SU ${risultatiGlobali.length} FILE`;
 
                 const list = document.getElementById('checkList');
                 list.innerHTML = '';
-                (data.controlli || []).forEach(c => {
-                    const bCls = c.stato === 'VERDE' ? 'bg-emerald-100 text-emerald-800' : c.stato === 'GIALLO' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800';
-                    list.innerHTML += `<div class="flex justify-between items-start p-4 bg-slate-50 border border-slate-200 rounded-lg"><div><h4 class="font-semibold text-slate-800 text-sm">${c.documento}</h4><p class="text-xs text-slate-500 mt-1">${c.dettaglio}</p></div><span class="text-xs font-bold px-2.5 py-1 rounded ${bCls}">${c.stato}</span></div>`;
+                
+                risultatiGlobali.forEach(res => {
+                    list.innerHTML += `<div class="p-3 bg-slate-100 rounded-lg font-bold text-xs text-slate-700 mt-2">📄 File: ${res.nome} - Stato: ${res.stato_generale}</div>`;
+                    (res.controlli || []).forEach(c => {
+                        const bCls = c.stato === 'VERDE' ? 'bg-emerald-100 text-emerald-800' : c.stato === 'GIALLO' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800';
+                        list.innerHTML += `<div class="flex justify-between items-start p-3 bg-slate-50 border border-slate-200 rounded-lg ml-4"><div><h4 class="font-semibold text-slate-800 text-sm">${c.documento}</h4><p class="text-xs text-slate-500 mt-1">${c.dettaglio}</p></div><span class="text-xs font-bold px-2.5 py-1 rounded ${bCls}">${c.stato}</span></div>`;
+                    });
                 });
 
-                document.getElementById('emailBox').value = data.email_sollecito || "Tutto ok.";
+                document.getElementById('emailBox').value = "Audit multiplo completato per i documenti selezionati.";
             } catch (err) {
                 document.getElementById('loading').classList.add('hidden');
                 alert('Errore connessione: ' + err.message);
