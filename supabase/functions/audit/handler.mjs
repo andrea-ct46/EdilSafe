@@ -36,12 +36,19 @@ Segnala in GIALLO i dati illeggibili, mancanti o che richiedono verifica; usa RO
 Usa VERDE solo per un elemento specifico effettivamente verificabile nel testo. Se il PDF non è pertinente o leggibile restituisci almeno una verifica GIALLO.
 Le date devono essere quelle scritte nel documento; non dedurre scadenze di legge. Indica quando una data esplicita è passata.
 La bozza email deve chiedere chiarimenti solo sui rilievi rilevati, senza dichiarazioni di conformità.`;
-      const response = await fetcher(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+      const providerUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+      const providerOptions = {
         method: 'POST', signal: AbortSignal.timeout(60000), headers: { 'Content-Type': 'application/json', 'x-goog-api-key': aiKey },
         body: JSON.stringify({ systemInstruction: { parts: [{ text: prompt }] }, contents: [{ role: 'user', parts: [{ text: `Contesto dichiarato: ${input.contextType}` }, { inline_data: { mime_type: 'application/pdf', data: input.fileBase64 } }] }],
           generationConfig: { responseMimeType: 'application/json', responseSchema: resultSchema, maxOutputTokens: 8192 } })
-      });
-      if (!response.ok) throw new AuditError(response.status === 429 ? 429 : 502, 'AI_PROVIDER', 'Servizio AI temporaneamente non disponibile. Riprova più tardi.');
+      };
+      let response = await fetcher(providerUrl, providerOptions);
+      if ([429, 500, 502, 503, 504].includes(response.status)) {
+        await response.body?.cancel();
+        await new Promise(resolve => setTimeout(resolve, 500));
+        response = await fetcher(providerUrl, providerOptions); // Same total 60-second deadline.
+      }
+      if (!response.ok) throw new AuditError(response.status === 429 ? 429 : 502, `AI_PROVIDER_${response.status}`, 'Servizio AI temporaneamente non disponibile. Riprova più tardi.');
       const provider = await response.json();
       const candidate = provider.candidates?.[0];
       if (!candidate || candidate.finishReason !== 'STOP') throw new AuditError(502, 'AI_INCOMPLETE', 'Analisi incompleta. Riprova con un documento più breve.');
@@ -68,8 +75,10 @@ La bozza email deve chiedere chiarimenti solo sui rilievi rilevati, senza dichia
       const known = error instanceof AuditError;
       const code = known ? error.code : error.name === 'TimeoutError' ? 'TIMEOUT' : 'INTERNAL';
       if (auditId && admin) {
-        const { error: cleanupError } = await admin.rpc('finish_audit', { p_audit_id: auditId, p_result: null, p_error_code: code }).catch(() => ({ error: true }));
-        if (cleanupError) logger.error('audit_release_failed', { auditId });
+        try {
+          const { error: cleanupError } = await admin.rpc('finish_audit', { p_audit_id: auditId, p_result: null, p_error_code: code });
+          if (cleanupError) logger.error('audit_release_failed', { auditId });
+        } catch { logger.error('audit_release_failed', { auditId }); }
       }
       logger.error('audit_failed', { code, auditId });
       return json({ error: known ? error.message : 'Analisi non riuscita. Riprova tra poco.', code }, known ? error.status : 503);

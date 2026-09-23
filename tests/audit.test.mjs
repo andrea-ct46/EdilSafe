@@ -8,9 +8,11 @@ const result = { stato_generale: 'DA_VERIFICARE', controlli: [{ documento: 'Docu
 const payload = { fileName: 'prova.pdf', contextType: 'Generico', fileBase64: btoa('%PDF-1.7\nfixture') };
 function setup({ providerStatus = 200, providerText = JSON.stringify(result), authError = false, quotaError, storageError = false, plus = false } = {}) {
   const calls = [];
-  const admin = { rpc: async (name, args) => {
+  const admin = { rpc: (name, args) => {
     calls.push({ name, args });
-    return { data: name === 'reserve_audit' ? quotaError ? { error: quotaError } : { id: 'job-1', is_plus: plus, nome_impresa: 'Studio test' } : true, error: null };
+    const value = { data: name === 'reserve_audit' ? quotaError ? { error: quotaError } : { id: 'job-1', is_plus: plus, nome_impresa: 'Studio test' } : true, error: null };
+    // PostgREST builders implement PromiseLike.then, not Promise.catch.
+    return { then: (resolve, reject) => Promise.resolve(value).then(resolve, reject) };
   } };
   const client = { auth: { getUser: async () => ({ data: { user: authError ? null : { id: 'user-1' } }, error: authError }) }, storage: { from: () => ({ upload: async () => ({ error: storageError }) }) } };
   const handler = createHandler({ createClient: (url, key) => key === 'service' ? admin : client, env: name => ({ SUPABASE_URL: 'https://example.test', SUPABASE_ANON_KEY: 'anon', SUPABASE_SERVICE_ROLE_KEY: 'service', GEMINI_API_KEY: 'test' })[name],
@@ -48,7 +50,8 @@ test('exhausted quota does not call provider', async () => {
 });
 test('provider errors release the quota reservation', async () => {
   const { handler, calls } = setup({ providerStatus: 500 });
-  assert.equal((await handler(request())).status, 502); assert.equal(calls.at(-1).args.p_error_code, 'AI_PROVIDER');
+  assert.equal((await handler(request())).status, 502); assert.equal(calls.at(-1).args.p_error_code, 'AI_PROVIDER_500');
+  assert.equal(calls.filter(c => c.name === 'provider').length, 2);
 });
 test('empty or malformed AI result is an error and refunds quota', async () => {
   for (const providerText of ['{}', 'not JSON', JSON.stringify({ ...result, controlli: [] })]) {
