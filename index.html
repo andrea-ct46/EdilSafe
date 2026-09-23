@@ -212,12 +212,12 @@
                         htmlContent += `
                             <div class="py-2 pl-2 flex justify-between items-center hover:bg-slate-50 rounded">
                                 <div class="overflow-hidden pr-2">
-                                    <span class="text-slate-700 font-medium truncate block max-w-[150px]" title="${pulito}">📄 ${pulito}</span>
+                                    <span class="text-slate-700 font-medium truncate block max-w-[150px]" title="${escapeHtml(pulito)}">📄 ${escapeHtml(pulito)}</span>
                                     <span class="text-slate-400 text-[9px]">${dataCaricamento}</span>
                                 </div>
                                 <div class="flex items-center gap-1 shrink-0">
-                                    ${signedUrl ? `<a href="${signedUrl.signedUrl}" target="_blank" class="text-[10px] bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-1 rounded font-semibold">Apri</a>` : ''}
-                                    <button onclick="eliminaFileCloud('${fullPath}')" class="text-[10px] bg-rose-50 text-rose-600 hover:bg-rose-100 px-1.5 py-1 rounded font-semibold cursor-pointer" title="Elimina">🗑️</button>
+                                    ${signedUrl ? `<a href="${escapeHtml(signedUrl.signedUrl)}" target="_blank" class="text-[10px] bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-1 rounded font-semibold">Apri</a>` : ''}
+                                    <button data-delete-path="${escapeHtml(fullPath)}" class="text-[10px] bg-rose-50 text-rose-600 hover:bg-rose-100 px-1.5 py-1 rounded font-semibold cursor-pointer" title="Elimina">🗑️</button>
                                 </div>
                             </div>
                         `;
@@ -368,4 +368,69 @@
         })();
     </script>
 </body>
-</html>
+</html>                 if (!session) throw new Error('Sessione scaduta. Accedi di nuovo.');
+                 const risultatiGlobali = [];
+                 const errori = [];
+                 const analyzeButton = document.getElementById('btnAnalyze');
+                 analyzeButton.disabled = true;
+                 try {
+                     for (const file of selectedFiles) {
+                         try {
+                             const base64File = toBase64(await file.arrayBuffer());
+                             const response = await fetch(SUPABASE_FUNCTION_URL, {
+                                 method: 'POST',
+                                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                                 body: JSON.stringify({ contextType: document.getElementById('contextType').value, fileName: file.name, fileBase64: base64File })
+                             });
+                             const data = await response.json().catch(() => ({}));
+                             if (!response.ok || data.error) throw new Error(data.error || `HTTP ${response.status}`);
+                             risultatiGlobali.push({ nome: file.name, ...data });
+                         } catch (error) {
+                             errori.push({ nome: file.name, messaggio: error.message });
+                         }
+                     }
+                 } finally {
+                     analyzeButton.disabled = false;
+                 }
+
+                 document.getElementById('loading').classList.add('hidden');
+                 await mostraDashboard(session.user.id);
+                 document.getElementById('results').classList.remove('hidden');
+                 const banner = document.getElementById('statusBanner');
+                 banner.className = `p-4 rounded-lg font-bold flex items-center gap-2 ${errori.length ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-blue-50 text-blue-700 border border-blue-200'}`;
+                 banner.innerText = `Audit: ${risultatiGlobali.length} riusciti, ${errori.length} falliti`;
+
+                 const list = document.getElementById('checkList');
+                 list.replaceChildren();
+                 for (const res of risultatiGlobali) {
+                     const heading = document.createElement('div');
+                     heading.className = 'p-3 bg-slate-100 rounded-lg font-bold text-xs text-slate-700 mt-2';
+                     heading.textContent = `📄 File: ${res.nome} - Stato: ${res.stato_generale ?? 'Da verificare'}`;
+                     list.append(heading);
+                     for (const c of res.controlli || []) {
+                         const row = document.createElement('div');
+                         row.className = 'flex justify-between items-start p-3 bg-slate-50 border border-slate-200 rounded-lg ml-4';
+                         const content = document.createElement('div');
+                         const title = document.createElement('h4');
+                         title.className = 'font-semibold text-slate-800 text-sm';
+                         title.textContent = c.documento ?? '';
+                         const detail = document.createElement('p');
+                         detail.className = 'text-xs text-slate-500 mt-1';
+                         detail.textContent = c.dettaglio ?? '';
+                         content.append(title, detail);
+                         const badge = document.createElement('span');
+                         const color = c.stato === 'VERDE' ? 'bg-emerald-100 text-emerald-800' : c.stato === 'GIALLO' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800';
+                         badge.className = `text-xs font-bold px-2.5 py-1 rounded ${color}`;
+                         badge.textContent = c.stato ?? 'DA VERIFICARE';
+                         row.append(content, badge);
+                         list.append(row);
+                     }
+                 }
+                 for (const error of errori) {
+                     const row = document.createElement('p');
+                     row.className = 'p-3 rounded-lg bg-rose-50 text-rose-700 text-xs';
+                     row.textContent = `❌ ${error.nome}: ${error.messaggio}`;
+                     list.append(row);
+                 }
+
+
