@@ -1,3 +1,4 @@
+import { companyFolder } from './company.mjs';
 import { AuditError, readBody, validateInput, parseResult, resultSchema } from './validation.mjs';
 import { generateWithFallback } from './provider.mjs';
 
@@ -36,6 +37,8 @@ Per ogni rilievo indica pagina e breve evidenza testuale nel dettaglio. Non inve
 Segnala in GIALLO i dati illeggibili, mancanti o che richiedono verifica; usa ROSSO per criticità documentate.
 Usa VERDE solo per un elemento specifico effettivamente verificabile nel testo. Se il PDF non è pertinente o leggibile restituisci almeno una verifica GIALLO.
 Le date devono essere quelle scritte nel documento; non dedurre scadenze di legge. Indica quando una data esplicita è passata.
+Per lo smistamento identifica l’impresa TITOLARE del documento (datore di lavoro/impresa esecutrice nel POS, soggetto verificato nel DURC), non committente, ente emittente, consulente o aziende solo citate.
+Imposta impresa.identificazione CERTA solo se un unico titolare è esplicito, con nome e breve citazione e pagina in evidenza. Riporta partita IVA/codice fiscale solo se leggibile e riferito a quel titolare; altrimenti stringa vuota. Se ci sono più titolari, il documento è personale senza datore esplicito o ci sono dubbi, usa INCERTA e campi vuoti. Non dedurre l’impresa dal nome del file o dal contesto.
 La bozza email deve chiedere chiarimenti solo sui rilievi rilevati, senza dichiarazioni di conformità.`;
       const providerOptions = {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': aiKey },
@@ -49,19 +52,21 @@ La bozza email deve chiedere chiarimenti solo sui rilievi rilevati, senza dichia
       const raw = (candidate.content?.parts || []).filter(p => !p.thought && typeof p.text === 'string').map(p => p.text).join('');
       const result = parseResult(raw);
       const warnings = [];
+      let archivio = null;
       if (reservation.is_plus) {
-        // Retain the legacy folder until the updated frontend is published.
-        // Ownership RLS, never the folder name, is the security boundary.
-        const folder = (reservation.nome_impresa || 'Impresa_Generica').replace(/[^a-zA-Z0-9]/g, '_');
-        const path = `${folder}/${crypto.randomUUID()}_${input.fileName}`;
         try {
-          const { error } = await client.storage.from('documenti-cantieri').upload(path, input.bytes, { contentType: 'application/pdf', upsert: false });
+          const storage = client.storage.from('documenti-cantieri');
+          const folder = await companyFolder(result.impresa, storage, user.id);
+          const path = `${user.id}/${folder}/${crypto.randomUUID()}_${input.fileName}`;
+          const { error } = await storage.upload(path, input.bytes, { contentType: 'application/pdf', upsert: false });
           if (error) throw error;
+          archivio = { cartella: folder, percorso: path, impresa: result.impresa?.nome || 'Da classificare' };
+          if (!result.impresa) warnings.push('Impresa non identificata con sicurezza: PDF salvato in “Da classificare”.');
         } catch {
           warnings.push('Analisi completata, ma PDF non archiviato. Conserva il file originale e riprova il caricamento più tardi.');
         }
       }
-      const output = { ...result, warnings, is_plus: reservation.is_plus, audit_id: auditId, model_used: modelUsed };
+      const output = { ...result, archivio, warnings, is_plus: reservation.is_plus, audit_id: auditId, model_used: modelUsed };
       const { data: finished, error: finishError } = await admin.rpc('finish_audit', { p_audit_id: auditId, p_result: output, p_error_code: null });
       if (finishError || !finished) throw new AuditError(503, 'SAVE_FAILED', 'Impossibile confermare il salvataggio dell’analisi. Verifica lo storico prima di riprovare.');
       return json(output);

@@ -7,7 +7,9 @@ const {window, document}=parseHTML(html);
 globalThis.window=window; globalThis.document=document;
 globalThis.alert=()=>{}; globalThis.confirm=()=>false;
 let authChange;
-const client={auth:{onAuthStateChange(cb){authChange=cb;},getSession:async()=>({data:{session:{access_token:'test',user:{id:'user-1'}}}}),signOut:async()=>{authChange('SIGNED_OUT');return {};}},from(table){return {select(){return this;},eq(){return this;},single:async()=>({data:{piu_attivo:false,scansioni_effettuate:0,scansioni_periodo:new Date().toISOString().slice(0,7)+'-01'}}),order(){return this;},limit:async()=>({data:[]})};}};
+const storageReads=[];
+const stored={ 'user-1':[{name:'ALFA_SRL__12345678901',id:null},{name:'Da_classificare',id:null}], 'user-1/ALFA_SRL__12345678901':[{name:'prova.pdf',id:'file-1'}], 'Impresa_Generica':[{name:'vecchio.pdf',id:'old-1'}] };
+const client={storage:{from:()=>({list:async prefix=>{storageReads.push(prefix);return {data:stored[prefix]||[]};}})},auth:{onAuthStateChange(cb){authChange=cb;},getSession:async()=>({data:{session:{access_token:'test',user:{id:'user-1'}}}}),signOut:async()=>{authChange('SIGNED_OUT');return {};}},from(table){return {select(){return this;},eq(){return this;},single:async()=>({data:{piu_attivo:true,scansioni_effettuate:0,scansioni_periodo:new Date().toISOString().slice(0,7)+'-01'}}),order(){return this;},limit:async()=>({data:[]})};}};
 window.supabase={createClient:()=>client};
 const hostile='<img src=x onerror=alert(1)>';
 let requests=0, providerDown=false;
@@ -47,6 +49,16 @@ test('all failures hide empty report actions and retry uses the selected PDF',as
   assert.equal($('btnPrint').classList.contains('hidden'),false);
   assert.equal($('emailSection').classList.contains('hidden'),false);
   assert.ok($('btnRetry').classList.contains('hidden'));
+});
+test('archive opens company folders and keeps legacy files accessible',async()=>{
+  $('btnBurger').click();await wait(()=>$('fileManagerList').textContent.includes('ALFA SRL'));
+  [...$('fileManagerList').querySelectorAll('button')].find(b=>b.textContent.includes('ALFA SRL')).click();
+  await wait(()=>$('fileManagerList').textContent.includes('prova.pdf'));
+  assert.equal(storageReads.at(-1),'user-1/ALFA_SRL__12345678901');
+  [...$('fileManagerList').querySelectorAll('button')].find(b=>b.textContent.includes('Tutte le imprese')).click();
+  await wait(()=>$('fileManagerList').textContent.includes('Archivio precedente'));
+  [...$('fileManagerList').querySelectorAll('button')].find(b=>b.textContent.includes('Archivio precedente')).click();
+  await wait(()=>$('fileManagerList').textContent.includes('vecchio.pdf'));
 });
 test('sign out clears reports and history',async()=>{
   $('btnLogout').click();await wait(()=>$('dashboardView').classList.contains('hidden'));

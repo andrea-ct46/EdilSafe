@@ -1,3 +1,4 @@
+import { readCompany } from './company.mjs';
 export const MAX_PDF_BYTES = 8 * 1024 * 1024;
 export const MAX_BODY_BYTES = Math.ceil(MAX_PDF_BYTES / 3) * 4 + 8192;
 export class AuditError extends Error {
@@ -41,13 +42,17 @@ export function validateInput(input) {
     bytes: Uint8Array.from(binary, char => char.charCodeAt(0)) };
 }
 export const resultSchema = {
-  type: 'OBJECT', required: ['stato_generale', 'controlli', 'email_sollecito'],
+  type: 'OBJECT', required: ['stato_generale', 'controlli', 'email_sollecito', 'impresa'],
   properties: {
     stato_generale: { type: 'STRING', enum: ['NESSUNA_CRITICITA_RILEVATA', 'DA_VERIFICARE', 'CRITICITA_RILEVATE'] },
     controlli: { type: 'ARRAY', items: { type: 'OBJECT', required: ['documento', 'stato', 'dettaglio'], properties: {
       documento: { type: 'STRING' }, stato: { type: 'STRING', enum: ['VERDE', 'GIALLO', 'ROSSO'] }, dettaglio: { type: 'STRING' }
     } } },
-    email_sollecito: { type: 'STRING' }
+    email_sollecito: { type: 'STRING' },
+    impresa: { type: 'OBJECT', required: ['identificazione', 'nome', 'identificativo_fiscale', 'evidenza'], properties: {
+      identificazione: { type: 'STRING', enum: ['CERTA', 'INCERTA'] },
+      nome: { type: 'STRING' }, identificativo_fiscale: { type: 'STRING' }, evidenza: { type: 'STRING' }
+    } }
   }
 };
 export function parseResult(raw) {
@@ -64,5 +69,5 @@ export function parseResult(raw) {
   // Never show an all-clear summary above a yellow/red finding.
   const stato_generale = controlli.some(c => c.stato === 'ROSSO') ? 'CRITICITA_RILEVATE'
     : controlli.some(c => c.stato === 'GIALLO') ? 'DA_VERIFICARE' : value.stato_generale;
-  return { stato_generale, controlli, email_sollecito: value.email_sollecito };
+  return { stato_generale, controlli, email_sollecito: value.email_sollecito, impresa: readCompany(value.impresa) };
 }
