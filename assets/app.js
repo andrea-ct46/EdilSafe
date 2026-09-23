@@ -104,6 +104,7 @@ function renderResults(results) {
     card.append(text('h4', result.name, 'font-bold text-sm'));
     if (result.error) card.append(text('p', result.error, 'text-rose-700 text-sm'));
     else {
+      if (result.data.archivio) card.append(text('p', `Archiviato in: ${result.data.archivio.impresa}`, 'text-blue-800 text-sm'));
       card.append(text('p', result.data.stato_generale, 'text-sm font-semibold'));
       for (const check of result.data.controlli) {
         const color = check.stato === 'VERDE' ? 'text-emerald-800' : check.stato === 'ROSSO' ? 'text-rose-800' : 'text-amber-800';
@@ -145,27 +146,42 @@ $('btnRetry').addEventListener('click', () => {
   $('btnAnalyze').click();
 });
 
-async function archive() {
+let archiveVersion = 0;
+async function archive(prefix = null, title = '') {
+  if (typeof prefix !== 'string') prefix = null;
+  const version = ++archiveVersion;
   if (!user || !profile?.piu_attivo) return;
   const owner = user.id;
   const container = $('fileManagerList'); container.textContent = 'Caricamento…';
   try {
-    // The UUID path is used by new audits. Existing files stay accessible via owner RLS.
+    // Folder navigation keeps old flat archives reachable.
     const legacy = (profile.nome_impresa || 'Impresa_Generica').replace(/[^a-zA-Z0-9]/g, '_');
     const entries = [];
-    for (const prefix of [...new Set([owner, legacy])]) {
+    for (const root of prefix ? [prefix] : [owner]) {
       for (let offset = 0; ; offset += 100) {
-        const { data, error } = await client.storage.from('documenti-cantieri').list(prefix, { limit: 100, offset, sortBy: { column: 'created_at', order: 'desc' } });
+        const { data, error } = await client.storage.from('documenti-cantieri').list(root, { limit: 100, offset, sortBy: { column: 'name', order: 'asc' } });
         if (error) throw error;
-        entries.push(...data.filter(f => f.id).map(f => ({ ...f, path: `${prefix}/${f.name}` })));
+        entries.push(...data.map(f => ({ ...f, path: `${root}/${f.name}` })));
         if (data.length < 100) break;
       }
     }
-    if (user?.id !== owner) return;
+    if (user?.id !== owner || version !== archiveVersion) return;
     container.replaceChildren();
+    if (prefix) {
+      const back = text('button', '← Tutte le imprese', 'text-blue-700 font-semibold');
+      back.addEventListener('click', () => archive()); container.append(back, text('p', title, 'font-bold break-words'));
+    } else {
+      const old = text('button', '📁 Archivio precedente', 'text-slate-600');
+      old.addEventListener('click', () => archive(legacy, 'Archivio precedente')); container.append(old);
+    }
     for (const file of entries) {
+      if (!file.id) {
+        const label = file.name.replaceAll('_', ' ');
+        const folder = text('button', `📁 ${label}`, 'block text-left text-blue-800 font-semibold py-2 break-words');
+        folder.addEventListener('click', () => archive(file.path, label)); container.append(folder); continue;
+      }
       const row = text('div', '', 'py-2 space-y-1');
-      row.append(text('p', file.name, 'break-all'));
+      row.append(text('p', file.name.replace(/^[0-9a-f-]{36}_/i, ''), 'break-all'));
       const open = text('button', 'Apri', 'text-blue-700 mr-3');
       open.addEventListener('click', async () => {
         const { data, error } = await client.storage.from('documenti-cantieri').createSignedUrl(file.path, 60);
@@ -178,12 +194,12 @@ async function archive() {
         remove.disabled = true;
         const { error } = await client.storage.from('documenti-cantieri').remove([file.path]);
         if (error) { remove.disabled = false; return alert('Eliminazione non riuscita.'); }
-        await archive();
+        await archive(prefix, title);
       });
       row.append(open, remove); container.append(row);
     }
-    if (!entries.length) container.textContent = 'Nessun documento archiviato.';
-  } catch { if (user?.id === owner) container.textContent = 'Archivio non disponibile. Premi Aggiorna per riprovare.'; }
+    if (!entries.length) container.append(text('p', prefix ? 'Nessun documento in questa cartella.' : 'Le cartelle delle imprese si creano automaticamente analizzando i PDF.'));
+  } catch { if (user?.id === owner && version === archiveVersion) container.textContent = 'Archivio non disponibile. Premi Aggiorna per riprovare.'; }
 }
 $('btnBurger').addEventListener('click', async e => {
   e.stopPropagation();

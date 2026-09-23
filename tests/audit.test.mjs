@@ -14,7 +14,7 @@ function setup({ providerStatus = 200, providerText = JSON.stringify(result), au
     // PostgREST builders implement PromiseLike.then, not Promise.catch.
     return { then: (resolve, reject) => Promise.resolve(value).then(resolve, reject) };
   } };
-  const client = { auth: { getUser: async () => ({ data: { user: authError ? null : { id: 'user-1' } }, error: authError }) }, storage: { from: () => ({ upload: async () => ({ error: storageError }) }) } };
+  const client = { auth: { getUser: async () => ({ data: { user: authError ? null : { id: 'user-1' } }, error: authError }) }, storage: { from: () => ({ list: async () => ({ data: [], error: null }), upload: async (path) => { calls.push({ name: 'upload', path }); return { error: storageError }; } }) } };
   const handler = createHandler({ createClient: (url, key) => key === 'service' ? admin : client, env: name => ({ SUPABASE_URL: 'https://example.test', SUPABASE_ANON_KEY: 'anon', SUPABASE_SERVICE_ROLE_KEY: 'service', GEMINI_API_KEY: 'test' })[name],
     fetcher: async () => { calls.push({ name: 'provider' }); return new Response(JSON.stringify({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: providerText }] } }] }), { status: providerStatus }); }, logger: { error() {} } });
   return { handler, calls };
@@ -68,4 +68,19 @@ test('successful audit persists history and warns on archive failure', async () 
   const response = await handler(request()); const body = await response.json();
   assert.equal(response.status, 200); assert.equal(body.warnings.length, 1);
   assert.equal(calls.at(-1).args.p_error_code, null); assert.deepEqual(calls.at(-1).args.p_result, body);
+});
+
+test('Plus files use the PDF company under the authenticated owner, never account name', async () => {
+  const company = { identificazione: 'CERTA', nome: 'Alfa Srl', identificativo_fiscale: 'IT12345678901', evidenza: 'Pagina 1: impresa esecutrice Alfa Srl' };
+  const {handler, calls} = setup({plus: true, providerText: JSON.stringify({...result, impresa:company})});
+  const body = await (await handler(request())).json();
+  assert.equal(body.archivio.cartella, 'ALFA_SRL__12345678901');
+  assert.match(calls.find(c=>c.name==='upload').path, /^user-1\/ALFA_SRL__12345678901\//);
+  assert.equal(body.warnings.length, 0);
+});
+test('ambiguous company is archived for classification without inventing an owner', async () => {
+  const {handler} = setup({plus:true});
+  const body = await (await handler(request())).json();
+  assert.equal(body.archivio.cartella, 'Da_classificare');
+  assert.match(body.warnings[0], /non identificata/);
 });
