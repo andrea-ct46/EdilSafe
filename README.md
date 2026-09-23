@@ -28,7 +28,7 @@ python -m http.server 8000
 
 Aprire `http://localhost:8000`. L'interfaccia usa il progetto Supabase configurato nel file `assets/app.js`; evitare prove con documenti reali finché migrazione e funzione non sono applicate. Le dipendenze del frontend sono caricate da CDN.
 
-Sono passati 19 test: validazione e batch, gestione errori del backend, interfaccia con DOM simulato, migrazione e policy su PostgreSQL locale (PGlite). I servizi Supabase e Gemini sono simulati nei test del backend; i test database usano uno schema minimo corrispondente ai componenti ispezionati. Non sostituiscono il collaudo del servizio distribuito.
+Sono passati 23 test: validazione e batch, gestione errori del backend, interfaccia con DOM simulato, migrazione e policy su PostgreSQL locale (PGlite). I servizi Supabase e Gemini sono simulati nei test del backend; i test database usano uno schema minimo corrispondente ai componenti ispezionati. Non sostituiscono il collaudo del servizio distribuito.
 
 ## Attivazione coordinata
 
@@ -37,7 +37,7 @@ Sono passati 19 test: validazione e batch, gestione errori del backend, interfac
 3. Verificare le policy e il flusso con un account di prova e un PDF sintetico. Non inviare documenti personali nei test.
 4. Pubblicare il frontend della PR solo dopo il passaggio precedente.
 
-La funzione usa `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` dell'ambiente Edge. Richiede `GEMINI_API_KEY`; il modello è configurabile con `GEMINI_MODEL` e mantiene come default il modello già presente (`gemini-3.6-flash`). Nessuna chiave segreta deve essere nel repository o nel frontend.
+La funzione usa `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` dell'ambiente Edge. Richiede `GEMINI_API_KEY`; il modello principale è configurabile con `GEMINI_MODEL` (default `gemini-3.6-flash`) e il modello di riserva con `GEMINI_FALLBACK_MODEL` (default `gemini-3.5-flash`). In caso di indisponibilità vengono effettuati al massimo tre tentativi, con attesa crescente e un limite totale di 60 secondi. Nessuna chiave segreta deve essere nel repository o nel frontend.
 
 ## Comportamento
 

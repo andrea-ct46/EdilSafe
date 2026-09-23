@@ -50,8 +50,8 @@ test('exhausted quota does not call provider', async () => {
 });
 test('provider errors release the quota reservation', async () => {
   const { handler, calls } = setup({ providerStatus: 500 });
-  assert.equal((await handler(request())).status, 502); assert.equal(calls.at(-1).args.p_error_code, 'AI_PROVIDER_500');
-  assert.equal(calls.filter(c => c.name === 'provider').length, 2);
+  assert.equal((await handler(request())).status, 503); assert.equal(calls.at(-1).args.p_error_code, 'AI_PROVIDER_500');
+  assert.equal(calls.filter(c => c.name === 'provider').length, 3);
 });
 test('empty or malformed AI result is an error and refunds quota', async () => {
   for (const providerText of ['{}', 'not JSON', JSON.stringify({ ...result, controlli: [] })]) {

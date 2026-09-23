@@ -1,4 +1,5 @@
 import { AuditError, readBody, validateInput, parseResult, resultSchema } from './validation.mjs';
+import { generateWithFallback } from './provider.mjs';
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
@@ -36,19 +37,12 @@ Segnala in GIALLO i dati illeggibili, mancanti o che richiedono verifica; usa RO
 Usa VERDE solo per un elemento specifico effettivamente verificabile nel testo. Se il PDF non è pertinente o leggibile restituisci almeno una verifica GIALLO.
 Le date devono essere quelle scritte nel documento; non dedurre scadenze di legge. Indica quando una data esplicita è passata.
 La bozza email deve chiedere chiarimenti solo sui rilievi rilevati, senza dichiarazioni di conformità.`;
-      const providerUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
       const providerOptions = {
-        method: 'POST', signal: AbortSignal.timeout(60000), headers: { 'Content-Type': 'application/json', 'x-goog-api-key': aiKey },
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': aiKey },
         body: JSON.stringify({ systemInstruction: { parts: [{ text: prompt }] }, contents: [{ role: 'user', parts: [{ text: `Contesto dichiarato: ${input.contextType}` }, { inline_data: { mime_type: 'application/pdf', data: input.fileBase64 } }] }],
           generationConfig: { responseMimeType: 'application/json', responseSchema: resultSchema, maxOutputTokens: 8192 } })
       };
-      let response = await fetcher(providerUrl, providerOptions);
-      if ([429, 500, 502, 503, 504].includes(response.status)) {
-        await response.body?.cancel();
-        await new Promise(resolve => setTimeout(resolve, 500));
-        response = await fetcher(providerUrl, providerOptions); // Same total 60-second deadline.
-      }
-      if (!response.ok) throw new AuditError(response.status === 429 ? 429 : 502, `AI_PROVIDER_${response.status}`, 'Servizio AI temporaneamente non disponibile. Riprova più tardi.');
+      const { response, model: modelUsed } = await generateWithFallback({ model, fallbackModel: env('GEMINI_FALLBACK_MODEL') || 'gemini-3.5-flash', options: providerOptions, fetcher });
       const provider = await response.json();
       const candidate = provider.candidates?.[0];
       if (!candidate || candidate.finishReason !== 'STOP') throw new AuditError(502, 'AI_INCOMPLETE', 'Analisi incompleta. Riprova con un documento più breve.');
@@ -67,7 +61,7 @@ La bozza email deve chiedere chiarimenti solo sui rilievi rilevati, senza dichia
           warnings.push('Analisi completata, ma PDF non archiviato. Conserva il file originale e riprova il caricamento più tardi.');
         }
       }
-      const output = { ...result, warnings, is_plus: reservation.is_plus, audit_id: auditId };
+      const output = { ...result, warnings, is_plus: reservation.is_plus, audit_id: auditId, model_used: modelUsed };
       const { data: finished, error: finishError } = await admin.rpc('finish_audit', { p_audit_id: auditId, p_result: output, p_error_code: null });
       if (finishError || !finished) throw new AuditError(503, 'SAVE_FAILED', 'Impossibile confermare il salvataggio dell’analisi. Verifica lo storico prima di riprovare.');
       return json(output);

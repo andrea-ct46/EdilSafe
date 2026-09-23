@@ -10,8 +10,8 @@ let authChange;
 const client={auth:{onAuthStateChange(cb){authChange=cb;},getSession:async()=>({data:{session:{access_token:'test',user:{id:'user-1'}}}}),signOut:async()=>{authChange('SIGNED_OUT');return {};}},from(table){return {select(){return this;},eq(){return this;},single:async()=>({data:{piu_attivo:false,scansioni_effettuate:0,scansioni_periodo:new Date().toISOString().slice(0,7)+'-01'}}),order(){return this;},limit:async()=>({data:[]})};}};
 window.supabase={createClient:()=>client};
 const hostile='<img src=x onerror=alert(1)>';
-let requests=0;
-globalThis.fetch=async()=>{requests++;return new Response(JSON.stringify({stato_generale:'DA_VERIFICARE',controlli:[{documento:hostile,stato:'GIALLO',dettaglio:hostile}],email_sollecito:'Email generata',warnings:[]}));};
+let requests=0, providerDown=false;
+globalThis.fetch=async()=>{requests++;if(providerDown)return new Response(JSON.stringify({error:'Servizio non disponibile'}),{status:503});return new Response(JSON.stringify({stato_generale:'DA_VERIFICARE',controlli:[{documento:hostile,stato:'GIALLO',dettaglio:hostile}],email_sollecito:'Email generata',warnings:[]}));};
 await import('../assets/app.js');
 const $=id=>document.getElementById(id);
 const wait=async fn=>{for(let i=0;i<100;i++){if(fn())return;await new Promise(r=>setTimeout(r,10));}throw Error('UI timeout');};
@@ -31,6 +31,22 @@ test('real UI batch displays individual failures, escaped text and generated ema
   assert.match($('checkList').textContent,/bad.pdf/); assert.ok($('checkList').textContent.includes(hostile));
   assert.equal($('checkList').querySelector('img'),null);
   assert.match($('emailBox').value,/Email generata/);
+});
+test('all failures hide empty report actions and retry uses the selected PDF',async()=>{
+  providerDown=true;
+  Object.defineProperty($('fileInput'),'files',{value:[new File(['%PDF-1.7\nfixture'],'retry.pdf')],configurable:true});
+  $('fileInput').dispatchEvent(new window.Event('change'));
+  $('btnAnalyze').click();await wait(()=>$('loading').classList.contains('hidden'));
+  assert.equal($('resultsTitle').textContent,'Analisi non completata');
+  assert.ok($('btnPrint').classList.contains('hidden'));
+  assert.ok($('emailSection').classList.contains('hidden'));
+  assert.equal($('btnRetry').classList.contains('hidden'),false);
+  providerDown=false;
+  $('btnRetry').click();await wait(()=>$('loading').classList.contains('hidden'));
+  assert.match($('statusBanner').textContent,/1 analizzati.*0 non riusciti/);
+  assert.equal($('btnPrint').classList.contains('hidden'),false);
+  assert.equal($('emailSection').classList.contains('hidden'),false);
+  assert.ok($('btnRetry').classList.contains('hidden'));
 });
 test('sign out clears reports and history',async()=>{
   $('btnLogout').click();await wait(()=>$('dashboardView').classList.contains('hidden'));
