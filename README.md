@@ -4,7 +4,7 @@ Pre-controllo assistito dei documenti di cantiere: PDF, rilievi motivati, bozza 
 
 ## Stato di questa modifica
 
-La migrazione e la nuova Edge Function sono **da applicare insieme prima di pubblicare il frontend**. Il progetto Supabase è stato riattivato; la modifica alle policy di produzione è rimasta bloccata dal controllo automatico in attesa dell'approvazione esplicita del proprietario. Il frontend è nella PR, non pubblicato.
+La migrazione e la nuova Edge Function devono essere applicate insieme prima di pubblicare il frontend. Seguire l'ordine di attivazione sotto riportato.
 
 ## Struttura
 
@@ -32,7 +32,7 @@ Sono passati 19 test: validazione e batch, gestione errori del backend, interfac
 
 ## Attivazione coordinata
 
-1. Applicare la migrazione SQL dopo autorizzazione. Conserva i profili, i contatori e i file esistenti. L'unico elemento Storage privo di proprietario rilevato durante l'ispezione era un segnaposto di cartella.
+1. Applicare la migrazione SQL dopo autorizzazione. Conserva i profili, i contatori e i file esistenti.
 2. Distribuire `audit/index.ts`, `audit/handler.mjs`, `audit/validation.mjs` e `audit/deno.json` come Edge Function `audit`. L'entrypoint verifica sempre il token con `auth.getUser()`, anche mantenendo `verify_jwt=false` come nella funzione originale.
 3. Verificare le policy e il flusso con un account di prova e un PDF sintetico. Non inviare documenti personali nei test.
 4. Pubblicare il frontend della PR solo dopo il passaggio precedente.
@@ -53,7 +53,5 @@ La funzione usa `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY
 ## Limiti ancora da validare prima della vendita
 
 Il test reale della funzione con Gemini e i test RLS in produzione restano da eseguire dopo autorizzazione della migrazione. Serve una valutazione dei risultati su documenti di prova controllati da un professionista. Pagamenti, recupero password, gestione della conservazione/cancellazione dei report e notifiche di scadenza non sono inclusi in questa modifica. Le date nel report sono evidenze del PDF, non scadenze normative dedotte automaticamente.
-
-La protezione Auth contro password compromesse risulta disattivata: configurazione da verificare in dashboard. Documentazione: https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection
 
 Riferimenti implementativi: https://supabase.com/docs/guides/storage/security/access-control e https://ai.google.dev/api/generate-content
