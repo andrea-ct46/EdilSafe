@@ -2,7 +2,7 @@ import { pdfBase64, processFiles } from './core.mjs';
 
 const client = window.supabase.createClient('https://tknjthnrqunkehcqdnrj.supabase.co', 'sb_publishable_L5SprRAfCuKNZ-GIwT_1tw_iuknN81x');
 const $ = id => document.getElementById(id);
-let selectedFiles = [], registering = false, profile = null, user = null, busy = false;
+let selectedFiles = [], registering = false, profile = null, user = null, busy = false, failedFiles = [], failedContext = null;
 client.auth.onAuthStateChange(event => { if (event === 'SIGNED_OUT') clearPrivateView(); });
 
 function text(tag, value, className = '') {
@@ -16,7 +16,7 @@ function authMessage(message, error = true) {
   $('authMessage').className = `text-xs text-center mt-2 ${error ? 'text-rose-600' : 'text-emerald-600'}`;
 }
 function clearPrivateView() {
-  user = null; profile = null; selectedFiles = [];
+  user = null; profile = null; selectedFiles = []; failedFiles = []; failedContext = null;
   $('fileInput').value = ''; $('fileName').textContent = '';
   $('checkList').replaceChildren(); $('emailBox').value = ''; $('historyList').replaceChildren(); $('printEmail')?.remove();
   $('fileManagerList').replaceChildren(); $('burgerDropdown').classList.add('hidden');
@@ -94,6 +94,9 @@ async function analyze(file, contextType) {
 function renderResults(results) {
   const ok = results.filter(r => !r.error);
   $('results').classList.remove('hidden');
+  $('resultsTitle').textContent = ok.length ? 'Report di pre-controllo documentale' : 'Analisi non completata';
+  $('btnPrint').classList.toggle('hidden', !ok.length);
+  $('btnRetry').classList.toggle('hidden', !failedFiles.length);
   $('statusBanner').textContent = `${ok.length} analizzati • ${results.length - ok.length} non riusciti • ${new Date().toLocaleString('it-IT')}`;
   $('checkList').replaceChildren();
   for (const result of results) {
@@ -111,25 +114,35 @@ function renderResults(results) {
     $('checkList').append(card);
   }
   $('emailBox').value = ok.map(r => typeof r.data.email_sollecito === 'string' && r.data.email_sollecito ? `${r.name}\n${r.data.email_sollecito}` : '').filter(Boolean).join('\n\n');
+  $('emailSection').classList.toggle('hidden', !$('emailBox').value);
 }
 $('btnAnalyze').addEventListener('click', async () => {
   if (busy) return;
   if (!selectedFiles.length) return alert('Seleziona almeno un PDF.');
   busy = true;
   const files = [...selectedFiles], contextType = $('contextType').value, owner = user?.id;
-  for (const id of ['btnAnalyze', 'btnLogout', 'fileInput', 'contextType']) $(id).disabled = true;
+  for (const id of ['btnAnalyze', 'btnRetry', 'btnLogout', 'fileInput', 'contextType']) $(id).disabled = true;
   $('loading').classList.remove('hidden'); $('results').classList.add('hidden');
   try {
     const results = await processFiles(files, file => analyze(file, contextType), (i, total, name) => {
       $('loading').querySelector('p').textContent = `Analisi ${i}/${total}: ${name}`;
     });
     if (!owner || user?.id !== owner) return;
+    failedFiles = files.filter((file, index) => results[index]?.error);
+    failedContext = contextType;
     renderResults(results);
     try { if (user) await dashboard(user); } catch { $('pianoBadge').textContent = 'Piano da aggiornare'; }
   } finally {
     busy = false; $('loading').classList.add('hidden');
-    for (const id of ['btnAnalyze', 'btnLogout', 'fileInput', 'contextType']) $(id).disabled = false;
+    for (const id of ['btnAnalyze', 'btnRetry', 'btnLogout', 'fileInput', 'contextType']) $(id).disabled = false;
   }
+});
+
+$('btnRetry').addEventListener('click', () => {
+  if (busy || !failedFiles.length) return;
+  selectFiles(failedFiles);
+  if (failedContext) $('contextType').value = failedContext;
+  $('btnAnalyze').click();
 });
 
 async function archive() {
@@ -206,7 +219,7 @@ async function history() {
     item.append(text('span', `${row.file_name} · ${new Date(row.created_at).toLocaleString('it-IT')}`));
     if (row.status === 'completed' && row.result) {
       const open = text('button', 'Apri report', 'text-blue-700');
-      open.addEventListener('click', () => { renderResults([{ name: row.file_name, data: row.result }]); $('results').scrollIntoView({ behavior: 'smooth' }); });
+      open.addEventListener('click', () => { failedFiles = []; renderResults([{ name: row.file_name, data: row.result }]); $('results').scrollIntoView({ behavior: 'smooth' }); });
       item.append(open);
     } else item.append(text('span', row.status === 'running' ? 'In corso' : 'Non riuscita'));
     $('historyList').append(item);
