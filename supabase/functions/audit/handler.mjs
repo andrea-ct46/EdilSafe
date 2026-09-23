@@ -42,7 +42,7 @@ La bozza email deve chiedere chiarimenti solo sui rilievi rilevati, senza dichia
         body: JSON.stringify({ systemInstruction: { parts: [{ text: prompt }] }, contents: [{ role: 'user', parts: [{ text: `Contesto dichiarato: ${input.contextType}` }, { inline_data: { mime_type: 'application/pdf', data: input.fileBase64 } }] }],
           generationConfig: { responseMimeType: 'application/json', responseSchema: resultSchema, maxOutputTokens: 8192 } })
       };
-      const { response, model: modelUsed } = await generateWithFallback({ model, fallbackModel: env('GEMINI_FALLBACK_MODEL') || 'gemini-3.8-flash', options: providerOptions, fetcher });
+      const { response, model: modelUsed } = await generateWithFallback({ model, fallbackModel: env('GEMINI_FALLBACK_MODEL') || 'gemini-3.5-flash', options: providerOptions, fetcher });
       const provider = await response.json();
       const candidate = provider.candidates?.[0];
       if (!candidate || candidate.finishReason !== 'STOP') throw new AuditError(502, 'AI_INCOMPLETE', 'Analisi incompleta. Riprova con un documento più breve.');

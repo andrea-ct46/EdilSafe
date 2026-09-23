@@ -37,7 +37,7 @@ Sono passati 23 test: validazione e batch, gestione errori del backend, interfac
 3. Verificare le policy e il flusso con un account di prova e un PDF sintetico. Non inviare documenti personali nei test.
 4. Pubblicare il frontend della PR solo dopo il passaggio precedente.
 
-La funzione usa `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` dell'ambiente Edge. Richiede `GEMINI_API_KEY`; il modello principale è configurabile con `GEMINI_MODEL` (default `gemini-3.6-flash`) e il modello di riserva con `GEMINI_FALLBACK_MODEL` (default `gemini-3.8-flash`). In caso di indisponibilità vengono effettuati al massimo tre tentativi, con attesa crescente e un limite totale di 60 secondi. Nessuna chiave segreta deve essere nel repository o nel frontend.
+La funzione usa `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` dell'ambiente Edge. Richiede `GEMINI_API_KEY`; il modello principale è configurabile con `GEMINI_MODEL` (default `gemini-3.6-flash`) e il modello di riserva con `GEMINI_FALLBACK_MODEL` (default `gemini-3.5-flash`). In caso di indisponibilità vengono effettuati al massimo tre tentativi, con attesa crescente e un limite totale di 60 secondi. Nessuna chiave segreta deve essere nel repository o nel frontend.
 
 ## Comportamento
 
