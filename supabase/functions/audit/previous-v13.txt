@@ -1,0 +1,109 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) return new Response(JSON.stringify({ error: "Non autorizzato." }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    if (userError || !user) return new Response(JSON.stringify({ error: "Utente non valido." }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    const { contextType, fileName, fileBase64 } = await req.json();
+
+    if (!fileBase64) return new Response(JSON.stringify({ error: "Nessun file ricevuto." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    // 1. VERIFICA PROFILO, PIANO E SCANSIONI MENSILI
+    const { data: profilo, error: profError } = await supabaseClient
+      .from("profili")
+      .select("piu_attivo, scansioni_effettuate, nome_impresa")
+      .eq("id", user.id)
+      .single();
+
+    if (profError || !profilo) {
+      return new Response(JSON.stringify({ error: "Profilo utente non trovato." }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const isAbbonatoPlus = profilo.piu_attivo === true; // true se ha EdilSafe+
+    const scansioniFatte = profilo.scansioni_effettuate || 0;
+
+    // Se è piano Free, metti il limite di 5 scansioni al mese
+    if (!isAbbonatoPlus && scansioniFatte >= 5) {
+      return new Response(JSON.stringify({ error: "Hai esaurito le 5 scansioni gratuite del mese. Passa a EdilSafe+ per sbloccare scansioni illimitate e il File Manager." }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // 2. CHIAMATA A GEMINI PER L'AUDIT
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    const SYSTEM_PROMPT = `Sei EdilSafe, un auditor di sicurezza nei cantieri edili (D.Lgs 81/08). Analizza il documento per il contesto "${contextType || "Generico"}". Restituisci ESCLUSIVAMENTE un oggetto JSON valido senza formattazione markdown: {"stato_generale": "CONFORME", "controlli": [{"documento": "Nome", "stato": "VERDE", "dettaglio": "Nota"}], "email_sollecito": "Testo"}`;
+
+    const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-3.6-flash:generateContent?key=${GEMINI_API_KEY}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: SYSTEM_PROMPT },
+            { inline_data: { mime_type: "application/pdf", data: fileBase64 } }
+          ]
+        }]
+      })
+    });
+
+    const geminiData = await geminiRes.json();
+    if (geminiData.error) {
+      return new Response(JSON.stringify({ error: "Errore Gemini: " + geminiData.error.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+    let resultJson;
+    try {
+      const cleanJson = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
+      resultJson = JSON.parse(cleanJson);
+    } catch (e) {
+      resultJson = {
+        stato_generale: "ATTENZIONE",
+        controlli: [{ documento: "Verifica Generale", stato: "GIALLO", dettaglio: "Documento analizzato ma struttura JSON non conforme." }],
+        email_sollecito: "Gentile Impresa, si richiede la verifica della documentazione."
+      };
+    }
+
+    // 3. AGGIORNA CONTATORE SCANSIONI NEL DATABASE
+    await supabaseClient.from("profili").update({ scansioni_effettuate: scansioniFatte + 1 }).eq("id", user.id);
+
+    // 4. SE HA EDILSAFE+, SALVA IL FILE NEL CLOUD E REGISTRA LO STORICO NEL FILE MANAGER
+    if (isAbbonatoPlus) {
+      const nomeImpresaCartella = profilo.nome_impresa ? profilo.nome_impresa.replace(/[^a-zA-Z0-9]/g, "_") : "Impresa_Generica";
+      try {
+        const byteCharacters = atob(fileBase64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
+        const blob = new Blob([new Uint8Array(byteNumbers)], { type: "application/pdf" });
+        const filePath = `${nomeImpresaCartella}/${Date.now()}_${fileName || "documento.pdf"}`;
+        
+        await supabaseClient.storage.from("documenti-cantieri").upload(filePath, blob, { contentType: "application/pdf", upsert: true });
+      } catch (storageErr) {
+        console.error("Errore storage:", storageErr);
+      }
+    }
+
+    return new Response(JSON.stringify({ ...resultJson, is_plus: isAbbonatoPlus }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+  } catch (error) {
+    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+});

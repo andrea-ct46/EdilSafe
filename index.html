@@ -6,6 +6,7 @@
     <title>EdilSafe - Audit Documentale Cantiere</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="assets/app.css">
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans min-h-screen">
 
@@ -14,7 +15,7 @@
         <div class="text-center mb-8">
             <span class="text-4xl">🏗️</span>
             <h1 class="text-2xl font-bold text-blue-700 mt-2">EdilSafe</h1>
-            <p class="text-sm text-slate-500 mt-1">Audit Sicurezza Cantieri & Abbonamenti</p>
+            <p class="text-sm text-slate-500 mt-1">Pre-controllo dei documenti di cantiere</p>
         </div>
         
         <div class="space-y-4">
@@ -29,19 +30,19 @@
                 <button id="btnLogin" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-all text-sm cursor-pointer">Accedi</button>
                 <button id="btnToggleMode" class="w-full bg-white hover:bg-slate-50 text-blue-700 border border-blue-200 font-bold py-2 px-4 rounded-lg transition-all text-sm cursor-pointer">Non hai un account? Registrati</button>
             </div>
-            <p id="authMessage" class="text-xs text-center text-rose-600 hidden"></p>
+            <p id="authMessage" role="status" aria-live="polite" class="text-xs text-center text-rose-600 hidden"></p>
         </div>
     </div>
 
     <!-- DASHBOARD -->
     <div id="dashboardView" class="max-w-5xl mx-auto p-6 space-y-6 hidden">
-        <header class="flex justify-between items-center bg-white border border-slate-200 p-4 rounded-xl shadow-sm relative">
+        <header class="flex flex-wrap gap-4 justify-between items-center bg-white border border-slate-200 p-4 rounded-xl shadow-sm relative">
             <div class="flex items-center gap-2">
                 <span class="text-2xl">🏗️</span>
                 <span class="text-xl font-bold text-blue-700 tracking-tight">EdilSafe</span>
             </div>
             
-            <div class="flex items-center gap-4 text-sm text-slate-500">
+            <div class="flex flex-wrap items-center gap-3 text-sm text-slate-500">
                 <span id="pianoBadge" class="bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1 rounded-full font-semibold">Piano: Verificando...</span>
                 
                 <!-- MENU BURGER FILE MANAGER (BLOCCATO SE FREE) -->
@@ -51,7 +52,7 @@
                         <span>▼</span>
                     </button>
                     
-                    <div id="burgerDropdown" class="hidden absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-lg p-4 z-50 space-y-3">
+                    <div id="burgerDropdown" class="hidden absolute right-0 mt-2 w-72 max-w-[85vw] bg-white border border-slate-200 rounded-xl shadow-lg p-4 z-50 space-y-3">
                         <div class="flex justify-between items-center border-b border-slate-100 pb-2">
                             <span class="font-bold text-xs uppercase text-slate-500 tracking-wider">Archivio Cloud Aziendale</span>
                             <button id="btnRefreshManager" class="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded cursor-pointer">Aggiorna</button>
@@ -70,11 +71,11 @@
             <!-- Upload Box -->
             <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
                 <h2 class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">1. Carica Documenti Cantiere</h2>
-                <div id="dropZone" class="border-2 border-dashed border-slate-200 hover:border-blue-500 bg-slate-50 hover:bg-blue-50/50 rounded-lg p-8 text-center cursor-pointer transition-all">
+                <div id="dropZone" role="button" tabindex="0" aria-label="Seleziona PDF" class="border-2 border-dashed border-slate-200 hover:border-blue-500 bg-slate-50 hover:bg-blue-50/50 rounded-lg p-8 text-center cursor-pointer transition-all">
                     <input type="file" id="fileInput" accept=".pdf" multiple class="hidden">
                     <div class="text-3xl mb-2">📄</div>
                     <p class="font-semibold text-slate-700">Trascina qui i file PDF (anche multipli)</p>
-                    <p class="text-xs text-slate-400 mt-1">oppure seleziona i file dal computer</p>
+                    <p class="text-xs text-slate-400 mt-1">oppure seleziona i file • massimo 8 MB per PDF</p>
                     <p id="fileName" class="text-xs text-blue-600 font-medium mt-3 hidden"></p>
                 </div>
             </div>
@@ -83,22 +84,22 @@
             <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm flex flex-col justify-between">
                 <div>
                     <h2 class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">2. Configurazione Contesto</h2>
-                    <select id="contextType" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 mb-4 focus:outline-none focus:border-blue-500">
+                    <select id="contextType" aria-label="Contesto del cantiere" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 mb-4 focus:outline-none focus:border-blue-500">
                         <option value="Ristrutturazione Edilizia con Ponteggio">Ristrutturazione Edilizia con Ponteggio</option>
                         <option value="Nuova Costruzione / Scavi">Nuova Costruzione / Scavi</option>
                         <option value="Impiantistica e Manutenzione">Impiantistica e Manutenzione</option>
                     </select>
                     <div class="space-y-2">
-                        <label class="block text-xs font-semibold text-slate-500">Verifiche Attive</label>
-                        <label class="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked disabled class="rounded text-blue-600"> D.Lgs 81/08 - Allegato XVII (Idoneità)</label>
-                        <label class="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked disabled class="rounded text-blue-600"> Controllo Scadenze (DURC, Visite, Attestati)</label>
+                        <label class="block text-xs font-semibold text-slate-500">Analisi assistita</label>
+                        <label class="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked disabled class="rounded text-blue-600"> Elementi documentali da verificare</label>
+                        <label class="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked disabled class="rounded text-blue-600"> Date e scadenze riportate nei documenti</label>
                     </div>
                 </div>
             </div>
         </div>
 
         <button id="btnAnalyze" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer">
-            <span>⚡ AVVIA AUDIT DOCUMENTALE MASSIVO</span>
+            <span>Avvia pre-controllo documentale</span>
         </button>
 
         <div id="loading" class="hidden bg-white border border-slate-200 rounded-xl p-8 text-center shadow-sm">
@@ -107,330 +108,19 @@
         </div>
 
         <div id="results" class="hidden bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-6">
-            <h2 class="text-lg font-bold text-slate-800">Report di Conformità Documentale</h2>
-            <div id="statusBanner" class="p-4 rounded-lg font-bold flex items-center gap-2"></div>
+            <h2 class="text-lg font-bold text-slate-800">Report di pre-controllo documentale</h2>
+            <div id="statusBanner" role="status" aria-live="polite" class="p-4 rounded-lg font-bold flex items-center gap-2"></div>
+            <p class="text-xs text-slate-500">Analisi assistita da AI: le segnalazioni richiedono verifica professionale e non certificano la conformità del cantiere.</p>
+            <button id="btnPrint" class="bg-blue-50 text-blue-700 px-4 py-2 rounded-lg text-sm">Stampa / salva report PDF</button>
             <div id="checkList" class="space-y-3"></div>
             <div class="border-t border-slate-100 pt-4">
                 <h3 class="text-sm font-semibold text-slate-700 mb-2">✉️ Bozza Email di Sollecito Precompilata</h3>
                 <textarea id="emailBox" readonly class="w-full h-28 bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-700 focus:outline-none resize-none"></textarea>
             </div>
         </div>
+        <section class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm"><div class="flex justify-between items-center"><h2 class="font-bold">Verifiche recenti</h2><button id="btnHistory" class="text-blue-700 text-sm">Aggiorna storico</button></div><div id="historyList" class="space-y-2 mt-4 text-sm"></div></section>
     </div>
 
-    <script>
-        const SUPABASE_URL = 'https://tknjthnrqunkehcqdnrj.supabase.co';
-        const SUPABASE_ANON_KEY = 'sb_publishable_L5SprRAfCuKNZ-GIwT_1tw_iuknN81x';
-        
-        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        const SUPABASE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/audit`;
-
-        let selectedFiles = [];
-        let isRegistering = false;
-        let utentePlus = false;
-        let nomeImpresaUtente = "";
-
-        const loginView = document.getElementById('loginView');
-        const dashboardView = document.getElementById('dashboardView');
-        const authMessage = document.getElementById('authMessage');
-        const dropZone = document.getElementById('dropZone');
-        const fileInput = document.getElementById('fileInput');
-
-        const btnBurger = document.getElementById('btnBurger');
-        const burgerDropdown = document.getElementById('burgerDropdown');
-
-        btnBurger.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            if (!utentePlus) {
-                alert("🔒 Funzione riservata agli abbonati EdilSafe+. Passa al piano Plus per sbloccare il File Manager Cloud.");
-                return;
-            }
-            burgerDropdown.classList.toggle('hidden');
-            if (!burgerDropdown.classList.contains('hidden')) {
-                caricaFileManagerCloud();
-            }
-        });
-
-        document.addEventListener('click', () => {
-            burgerDropdown.classList.add('hidden');
-        });
-
-        burgerDropdown.addEventListener('click', (e) => e.stopPropagation());
-
-        function mostraMessaggio(message, isError = true) {
-            authMessage.innerText = message;
-            authMessage.className = `text-xs text-center mt-2 ${isError ? 'text-rose-600' : 'text-emerald-600'}`;
-            authMessage.classList.remove('hidden');
-        }
-
-        document.getElementById('btnToggleMode').addEventListener('click', () => {
-            isRegistering = !isRegistering;
-            document.getElementById('extraFields').classList.toggle('hidden', !isRegistering);
-            document.getElementById('btnLogin').innerText = isRegistering ? 'Registrati ora' : 'Accedi';
-            document.getElementById('btnToggleMode').innerText = isRegistering ? 'Hai già un account? Accedi' : 'Non hai un account? Registrati';
-            authMessage.classList.add('hidden');
-        });
-
-        async function caricaFileManagerCloud() {
-            if (!utentePlus) return;
-            const container = document.getElementById('fileManagerList');
-            container.innerHTML = '<p class="text-slate-400 py-4 text-center text-xs">Organizzazione file in corso...</p>';
-
-            try {
-                const { data: files, error } = await supabaseClient.storage.from('documenti-cantieri').list(nomeImpresaUtente, { limit: 100, sortBy: { column: 'created_at', order: 'desc' } });
-
-                if (error || !files || files.length === 0) {
-                    container.innerHTML = '<p class="text-slate-400 py-4 text-center text-xs">Nessun file archiviato nel cloud.</p>';
-                    return;
-                }
-
-                container.innerHTML = '';
-                
-                const categorie = { "POS": [], "DURC": [], "Formazione": [], "Altri Documenti": [] };
-
-                for (const file of files) {
-                    if (file.name === '.emptyFolderPlaceholder') continue;
-                    
-                    const nomeUpper = file.name.toUpperCase();
-                    if (nomeUpper.includes('POS')) categorie['POS'].push(file);
-                    else if (nomeUpper.includes('DURC')) categorie['DURC'].push(file);
-                    else if (nomeUpper.includes('CORSO') || nomeUpper.includes('ATTESTATO') || nomeUpper.includes('FORMAZIONE')) categorie['Formazione'].push(file);
-                    else categorie['Altri Documenti'].push(file);
-                }
-
-                let htmlContent = '';
-                for (const [cat, lista] of Object.entries(categorie)) {
-                    if (lista.length === 0) continue;
-                    
-                    htmlContent += `<div class="pt-2 pb-1 font-bold text-blue-700 text-xs border-b border-slate-100 uppercase tracking-wider">📁 ${cat} (${lista.length})</div>`;
-                    
-                    for (const file of lista) {
-                        const fullPath = `${nomeImpresaUtente}/${file.name}`;
-                        const { data: signedUrl } = await supabaseClient.storage.from('documenti-cantieri').createSignedUrl(fullPath, 3600);
-                        const pulito = file.name.includes('_') ? file.name.substring(file.name.indexOf('_') + 1) : file.name;
-                        const dataCaricamento = new Date(file.created_at).toLocaleDateString();
-
-                        htmlContent += `
-                            <div class="py-2 pl-2 flex justify-between items-center hover:bg-slate-50 rounded">
-                                <div class="overflow-hidden pr-2">
-                                    <span class="text-slate-700 font-medium truncate block max-w-[150px]" title="${escapeHtml(pulito)}">📄 ${escapeHtml(pulito)}</span>
-                                    <span class="text-slate-400 text-[9px]">${dataCaricamento}</span>
-                                </div>
-                                <div class="flex items-center gap-1 shrink-0">
-                                    ${signedUrl ? `<a href="${escapeHtml(signedUrl.signedUrl)}" target="_blank" class="text-[10px] bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-1 rounded font-semibold">Apri</a>` : ''}
-                                    <button data-delete-path="${escapeHtml(fullPath)}" class="text-[10px] bg-rose-50 text-rose-600 hover:bg-rose-100 px-1.5 py-1 rounded font-semibold cursor-pointer" title="Elimina">🗑️</button>
-                                </div>
-                            </div>
-                        `;
-                    }
-                }
-
-                container.innerHTML = htmlContent || '<p class="text-slate-400 py-4 text-center text-xs">Nessun file trovato.</p>';
-            } catch (err) {
-                container.innerHTML = `<p class="text-rose-500 py-2 text-center text-xs">Errore caricamento archivio.</p>`;
-            }
-        }
-
-        window.eliminaFileCloud = async function(path) {
-            if (!confirm("Eliminare definitivamente questo file dal cloud?")) return;
-            await supabaseClient.storage.from('documenti-cantieri').remove([path]);
-            caricaFileManagerCloud();
-        };
-
-        document.getElementById('btnRefreshManager').addEventListener('click', caricaFileManagerCloud);
-
-        async function mostraDashboard(userId) {
-            loginView.classList.add('hidden');
-            dashboardView.classList.remove('hidden');
-
-            const { data: profilo } = await supabaseClient.from('profili').select('piu_attivo, nome_impresa, scansioni_effettuate').eq('id', userId).single();
-            
-            utentePlus = profilo?.piu_attivo === true;
-            nomeImpresaUtente = (profilo?.nome_impresa || "Impresa_Generica").replace(/[^a-zA-Z0-9]/g, "_");
-
-            const badge = document.getElementById('pianoBadge');
-            const btnB = document.getElementById('btnBurger');
-
-            if (utentePlus) {
-                badge.className = "bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full font-semibold";
-                badge.innerText = "Piano: EdilSafe+ (Illimitato + Cloud)";
-                btnB.classList.remove('opacity-60');
-                btnB.innerHTML = '<span>📁 File Manager Plus</span><span>▼</span>';
-            } else {
-                const rimanenti = Math.max(0, 5 - (profilo?.scansioni_effettuate || 0));
-                badge.className = "bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1 rounded-full font-semibold";
-                badge.innerText = `Piano: Free (${rimanenti}/5 Scansioni)`;
-                btnB.classList.add('opacity-60');
-                btnB.innerHTML = '<span>📁 File Manager Plus 🔒</span><span>▼</span>';
-            }
-        }
-
-        document.getElementById('btnLogin').addEventListener('click', async () => {
-            const email = document.getElementById('emailInput').value.trim();
-            const password = document.getElementById('passwordInput').value;
-
-            if (!email || !password || password.length < 6) return mostraMessaggio('Dati non validi (pass min. 6).');
-
-            if (isRegistering) {
-                const nome_impresa = document.getElementById('impresaInput').value.trim();
-                const p_iva = document.getElementById('pivaInput').value.trim();
-                if (!nome_impresa) return mostraMessaggio('Inserisci nome impresa.');
-
-                const { data, error } = await supabaseClient.auth.signUp({ email, password, options: { data: { nome_impresa, p_iva } } });
-                if (error) mostraMessaggio(error.message);
-                else if (data.session) mostraDashboard(data.user.id);
-                else mostraMessaggio('Registrazione ok! Conferma l\'email.', false);
-            } else {
-                const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-                if (error) mostraMessaggio('Credenziali errate.');
-                else if (data.session) mostraDashboard(data.user.id);
-            }
-        });
-
-        document.getElementById('btnLogout').addEventListener('click', async () => {
-            await supabaseClient.auth.signOut();
-            loginView.classList.remove('hidden');
-            dashboardView.classList.add('hidden');
-        });
-
-        dropZone.addEventListener('click', () => fileInput.click());
-        dropZone.addEventListener('dragover', (e) => e.preventDefault());
-        dropZone.addEventListener('drop', (e) => { e.preventDefault(); handleFiles(e.dataTransfer.files); });
-        fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
-
-        function handleFiles(files) {
-            selectedFiles = Array.from(files).filter(f => f.type === 'application/pdf');
-            if (selectedFiles.length === 0) return alert('Seleziona almeno un file PDF valido.');
-            
-            const fileNames = selectedFiles.map(f => f.name).join(', ');
-            document.getElementById('fileName').innerText = `Selezionati (${selectedFiles.length}): ${fileNames}`;
-            document.getElementById('fileName').classList.remove('hidden');
-        }
-
-        document.getElementById('btnAnalyze').addEventListener('click', async () => {
-            if (selectedFiles.length === 0) return alert('Carica almeno un PDF.');
-            
-            document.getElementById('loading').classList.remove('hidden');
-            document.getElementById('results').classList.add('hidden');
-
-            try {
-                const session = (await supabaseClient.auth.getSession()).data.session;
-                let risultatiGlobali = [];
-
-                for (const file of selectedFiles) {
-                    const buffer = await file.arrayBuffer();
-                    const base64File = btoa(String.fromCharCode(...new Uint8Array(buffer)));
-                    
-                    const response = await fetch(SUPABASE_FUNCTION_URL, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-                        body: JSON.stringify({ contextType: document.getElementById('contextType').value, fileName: file.name, fileBase64: base64File })
-                    });
-
-                    const data = await response.json();
-                    if (data.error) {
-                        alert(`Errore su ${file.name}: ${data.error}`);
-                        break;
-                    }
-                    risultatiGlobali.push({ nome: file.name, ...data });
-                }
-
-                document.getElementById('loading').classList.add('hidden');
-                await mostraDashboard(session.user.id);
-
-                if (risultatiGlobali.length === 0) return;
-
-                document.getElementById('results').classList.remove('hidden');
-                const banner = document.getElementById('statusBanner');
-                banner.className = `p-4 rounded-lg font-bold flex items-center gap-2 bg-blue-50 text-blue-700 border border-blue-200`;
-                banner.innerText = `AUDIT COMPLETATO SU ${risultatiGlobali.length} FILE`;
-
-                const list = document.getElementById('checkList');
-                list.innerHTML = '';
-                
-                risultatiGlobali.forEach(res => {
-                    list.innerHTML += `<div class="p-3 bg-slate-100 rounded-lg font-bold text-xs text-slate-700 mt-2">📄 File: ${res.nome} - Stato: ${res.stato_generale}</div>`;
-                    (res.controlli || []).forEach(c => {
-                        const bCls = c.stato === 'VERDE' ? 'bg-emerald-100 text-emerald-800' : c.stato === 'GIALLO' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800';
-                        list.innerHTML += `<div class="flex justify-between items-start p-3 bg-slate-50 border border-slate-200 rounded-lg ml-4"><div><h4 class="font-semibold text-slate-800 text-sm">${c.documento}</h4><p class="text-xs text-slate-500 mt-1">${c.dettaglio}</p></div><span class="text-xs font-bold px-2.5 py-1 rounded ${bCls}">${c.stato}</span></div>`;
-                    });
-                });
-
-                document.getElementById('emailBox').value = "Audit multiplo completato per i documenti selezionati.";
-            } catch (err) {
-                document.getElementById('loading').classList.add('hidden');
-                alert('Errore connessione: ' + err.message);
-            }
-        });
-
-        (async function checkSession() {
-            const { data } = await supabaseClient.auth.getSession();
-            if (data?.session?.user) mostraDashboard(data.session.user.id);
-        })();
-    </script>
+    <script type="module" src="assets/app.js"></script>
 </body>
-</html>                 if (!session) throw new Error('Sessione scaduta. Accedi di nuovo.');
-                 const risultatiGlobali = [];
-                 const errori = [];
-                 const analyzeButton = document.getElementById('btnAnalyze');
-                 analyzeButton.disabled = true;
-                 try {
-                     for (const file of selectedFiles) {
-                         try {
-                             const base64File = toBase64(await file.arrayBuffer());
-                             const response = await fetch(SUPABASE_FUNCTION_URL, {
-                                 method: 'POST',
-                                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-                                 body: JSON.stringify({ contextType: document.getElementById('contextType').value, fileName: file.name, fileBase64: base64File })
-                             });
-                             const data = await response.json().catch(() => ({}));
-                             if (!response.ok || data.error) throw new Error(data.error || `HTTP ${response.status}`);
-                             risultatiGlobali.push({ nome: file.name, ...data });
-                         } catch (error) {
-                             errori.push({ nome: file.name, messaggio: error.message });
-                         }
-                     }
-                 } finally {
-                     analyzeButton.disabled = false;
-                 }
-
-                 document.getElementById('loading').classList.add('hidden');
-                 await mostraDashboard(session.user.id);
-                 document.getElementById('results').classList.remove('hidden');
-                 const banner = document.getElementById('statusBanner');
-                 banner.className = `p-4 rounded-lg font-bold flex items-center gap-2 ${errori.length ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-blue-50 text-blue-700 border border-blue-200'}`;
-                 banner.innerText = `Audit: ${risultatiGlobali.length} riusciti, ${errori.length} falliti`;
-
-                 const list = document.getElementById('checkList');
-                 list.replaceChildren();
-                 for (const res of risultatiGlobali) {
-                     const heading = document.createElement('div');
-                     heading.className = 'p-3 bg-slate-100 rounded-lg font-bold text-xs text-slate-700 mt-2';
-                     heading.textContent = `📄 File: ${res.nome} - Stato: ${res.stato_generale ?? 'Da verificare'}`;
-                     list.append(heading);
-                     for (const c of res.controlli || []) {
-                         const row = document.createElement('div');
-                         row.className = 'flex justify-between items-start p-3 bg-slate-50 border border-slate-200 rounded-lg ml-4';
-                         const content = document.createElement('div');
-                         const title = document.createElement('h4');
-                         title.className = 'font-semibold text-slate-800 text-sm';
-                         title.textContent = c.documento ?? '';
-                         const detail = document.createElement('p');
-                         detail.className = 'text-xs text-slate-500 mt-1';
-                         detail.textContent = c.dettaglio ?? '';
-                         content.append(title, detail);
-                         const badge = document.createElement('span');
-                         const color = c.stato === 'VERDE' ? 'bg-emerald-100 text-emerald-800' : c.stato === 'GIALLO' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800';
-                         badge.className = `text-xs font-bold px-2.5 py-1 rounded ${color}`;
-                         badge.textContent = c.stato ?? 'DA VERIFICARE';
-                         row.append(content, badge);
-                         list.append(row);
-                     }
-                 }
-                 for (const error of errori) {
-                     const row = document.createElement('p');
-                     row.className = 'p-3 rounded-lg bg-rose-50 text-rose-700 text-xs';
-                     row.textContent = `❌ ${error.nome}: ${error.messaggio}`;
-                     list.append(row);
-                 }
-
-
+</html>
