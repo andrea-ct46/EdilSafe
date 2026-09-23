@@ -52,6 +52,6 @@ La funzione usa `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY
 
 ## Limiti ancora da validare prima della vendita
 
-Il test reale della funzione con Gemini e i test RLS in produzione restano da eseguire dopo autorizzazione della migrazione. Serve una valutazione dei risultati su documenti di prova controllati da un professionista. Pagamenti, recupero password, gestione della conservazione/cancellazione dei report e notifiche di scadenza non sono inclusi in questa modifica. Le date nel report sono evidenze del PDF, non scadenze normative dedotte automaticamente.
+Dopo ogni rilascio verificare il percorso completo con un PDF sintetico e due account di prova, inclusi storico e archivio. Serve una valutazione dei risultati su documenti di prova controllati da un professionista. Pagamenti, recupero password, gestione della conservazione/cancellazione dei report e notifiche di scadenza non sono inclusi in questa modifica. Le date nel report sono evidenze del PDF, non scadenze normative dedotte automaticamente.
 
 Riferimenti implementativi: https://supabase.com/docs/guides/storage/security/access-control e https://ai.google.dev/api/generate-content
