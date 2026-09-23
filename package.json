@@ -1,0 +1,16 @@
+{
+  "name": "edilsafe",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "check": "node --check assets/app.js"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
+    "linkedom": "0.18.13"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.117.1"
+  }
+}

@@ -1,0 +1,11 @@
+button:disabled { opacity: .55; cursor: wait; }
+:focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+#checkList p, #checkList h4 { overflow-wrap: anywhere; }
+@media print {
+  body { background: white; color: black; }
+  #loginView, #dashboardView > :not(#results), #btnPrint { display: none !important; }
+  #dashboardView, #results { display: block !important; margin: 0; padding: 0; border: 0; box-shadow: none; }
+  #checkList > div { break-inside: avoid; }
+  #emailBox { display: none; }
+  #printEmail { display: block !important; white-space: pre-wrap; font: 12px sans-serif; }
+}
